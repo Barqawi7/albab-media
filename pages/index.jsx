@@ -41,6 +41,12 @@ const dark={bg:"#060A13",s1:"#0C1220",s2:"#111827",s3:"#1A2332",border:"#1E293B"
 
 const fmt=n=>n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(0)+"K":String(Math.round(n));
 
+// ===== MODAL & FORMS =====
+function Modal({open,onClose,title,children}){const t=useContext(ThemeCtx);if(!open)return null;return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999}} onClick={onClose}><div style={{background:t.s1,borderRadius:16,border:"1px solid "+t.border,padding:24,width:480,maxWidth:"90vw",maxHeight:"80vh",overflow:"auto"}} onClick={e=>e.stopPropagation()}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}><div style={{fontSize:18,fontWeight:700,color:t.tw}}>{title}</div><div onClick={onClose} style={{cursor:"pointer",color:t.td,fontSize:22,lineHeight:1}}>{"\u00D7"}</div></div>{children}</div></div>;}
+function FormField({label,value,onChange,type="text",options}){const t=useContext(ThemeCtx);return <div style={{marginBottom:14}}><div style={{fontSize:12,color:t.td,marginBottom:4,fontWeight:500}}>{label}</div>{options?<select value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",padding:"9px 12px",background:t.s2,border:"1px solid "+t.border,borderRadius:8,color:t.text,fontSize:13,outline:"none"}}>{options.map(o=><option key={o} value={o}>{o}</option>)}</select>:<input type={type} value={value} onChange={e=>onChange(e.target.value)} style={{width:"100%",padding:"9px 12px",background:t.s2,border:"1px solid "+t.border,borderRadius:8,color:t.text,fontSize:13,outline:"none"}}/>}</div>;}
+function FormBtn({label,onClick,color}){const t=useContext(ThemeCtx);return <button onClick={onClick} style={{padding:"10px 24px",borderRadius:8,border:"none",background:color||t.blue,color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer",marginRight:8}}>{label}</button>;}
+function DelBtn({onClick}){const t=useContext(ThemeCtx);return <div onClick={e=>{e.stopPropagation();if(confirm("Delete this record?"))onClick()}} style={{cursor:"pointer",color:t.red,fontSize:11,opacity:.6,padding:"2px 6px",borderRadius:4}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=.6}>{"\u2715"}</div>;}
+
 // ===== STAGES =====
 const STAGES=[{k:"Prospect",c:"#94A3B8"},{k:"Funnel",c:"#60A5FA"},{k:"Upside",c:"#A78BFA"},{k:"Commit",c:"#F59E0B"},{k:"Awarded",c:"#10B981"},{k:"Lost",c:"#EF4444"},{k:"Dropped",c:"#6B7280"}];
 const stgC=s=>(STAGES.find(x=>x.k===s)||{c:"#94A3B8"}).c;
@@ -100,19 +106,26 @@ function SalesPage(){
   const t=useContext(ThemeCtx);
   const [filter,setFilter]=useState("All");
   const [search,setSearch]=useState("");
+  const [showAdd,setShowAdd]=useState(false);
+  const [leads,setLeads]=useState(SALES);
+  const [form,setForm]=useState({cl:"",v:"",sp:"",em:"",st:"Prospect"});
   const stages=["All",...STAGES.map(s=>s.k)];
-  let list=SALES;
+  const pipe={};leads.forEach(s=>pipe[s.st]=(pipe[s.st]||0)+1);
+  let list=leads;
   if(filter!=="All")list=list.filter(s=>s.st===filter);
   if(search)list=list.filter(s=>(s.cl+s.sp+s.v).toLowerCase().includes(search.toLowerCase()));
+  const addLead=()=>{if(!form.cl)return;setLeads(p=>[{...form},...p]);setForm({cl:"",v:"",sp:"",em:"",st:"Prospect"});setShowAdd(false);};
+  const delLead=(i)=>{const idx=leads.indexOf(list[i]);if(idx>=0)setLeads(p=>p.filter((_,j)=>j!==idx));};
   return <div style={{display:"flex",flexDirection:"column",gap:16}}>
     <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-      <KPI label="Total deals" value={SALES.length} sub={(S.pipe.Awarded||0)+" awarded"} pos/>
-      <KPI label="Active" value={(S.pipe.Prospect||0)+(S.pipe.Funnel||0)+(S.pipe.Upside||0)} sub="In pipeline" pos/>
-      <KPI label="Win rate" value={((S.pipe.Awarded||0)/SALES.length*100).toFixed(0)+"%"} pos/>
-      <KPI label="Lost+Dropped" value={(S.pipe.Lost||0)+(S.pipe.Dropped||0)} pos={false}/>
+      <KPI label="Total deals" value={leads.length} sub={(pipe.Awarded||0)+" awarded"} pos/>
+      <KPI label="Active" value={(pipe.Prospect||0)+(pipe.Funnel||0)+(pipe.Upside||0)} sub="In pipeline" pos/>
+      <KPI label="Win rate" value={leads.length?((pipe.Awarded||0)/leads.length*100).toFixed(0)+"%":"0%"} pos/>
+      <KPI label="Lost+Dropped" value={(pipe.Lost||0)+(pipe.Dropped||0)} pos={false}/>
     </div>
     <Card>
       <CH title={`Leads (${list.length})`} right={<div style={{display:"flex",gap:3,flexWrap:"wrap",alignItems:"center"}}>
+        <FormBtn label="+ Add lead" onClick={()=>setShowAdd(true)} color={t.green}/>
         <input placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{background:t.bg,border:"1px solid "+t.border,borderRadius:6,padding:"5px 10px",color:t.text,fontSize:12,width:130,outline:"none",marginRight:6}}/>
         {stages.map(s=><Btn key={s} active={filter===s} label={s} onClick={()=>setFilter(s)}/>)}
       </div>}/>
@@ -121,9 +134,18 @@ function SalesPage(){
           <div style={{width:32,height:32,borderRadius:8,background:stgC(s.st)+"1F",display:"flex",alignItems:"center",justifyContent:"center",color:stgC(s.st),fontWeight:700,fontSize:13,flexShrink:0}}>{s.cl[0]}</div>
           <div style={{flex:2,minWidth:0}}><div style={{fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.cl}</div><div style={{fontSize:11,color:t.td}}>{s.sp}{s.v?" · "+s.v:""}</div></div>
           <div style={{width:80}}><Pill color={stgC(s.st)}>{s.st}</Pill></div>
+          <DelBtn onClick={()=>delLead(i)}/>
         </div>)}
       </div>
     </Card>
+    <Modal open={showAdd} onClose={()=>setShowAdd(false)} title="Add new lead">
+      <FormField label="Client / Company" value={form.cl} onChange={v=>setForm(p=>({...p,cl:v}))}/>
+      <FormField label="Vertical / Industry" value={form.v} onChange={v=>setForm(p=>({...p,v:v}))}/>
+      <FormField label="Contact person" value={form.sp} onChange={v=>setForm(p=>({...p,sp:v}))}/>
+      <FormField label="Email" value={form.em} onChange={v=>setForm(p=>({...p,em:v}))}/>
+      <FormField label="Stage" value={form.st} onChange={v=>setForm(p=>({...p,st:v}))} options={STAGES.map(s=>s.k)}/>
+      <div style={{marginTop:8}}><FormBtn label="Add lead" onClick={addLead}/></div>
+    </Modal>
   </div>;
 }
 
@@ -168,15 +190,25 @@ function InfPage(){
 function CashPage(){
   const t=useContext(ThemeCtx);
   const [search,setSearch]=useState("");
-  let list=FIN;if(search)list=list.filter(f=>f.cl.toLowerCase().includes(search.toLowerCase()));
-  const topV=Object.entries(S.verts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const [showAdd,setShowAdd]=useState(false);
+  const [invoices,setInvoices]=useState(FIN);
+  const [form,setForm]=useState({cl:"",v:"",rev:"",pd:""});
+  const totalRev=invoices.reduce((a,f)=>a+f.rev,0);
+  const totalPd=invoices.reduce((a,f)=>a+f.pd,0);
+  const totalDue=totalRev-totalPd;
+  let list=invoices;if(search)list=list.filter(f=>f.cl.toLowerCase().includes(search.toLowerCase()));
+  const verts={};invoices.forEach(f=>{verts[f.v||"Other"]=(verts[f.v||"Other"]||0)+f.rev;});
+  const topV=Object.entries(verts).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const mxV=topV[0]?.[1]||1;
+  const topCl={};invoices.forEach(f=>{topCl[f.cl]=(topCl[f.cl]||0)+f.rev;});
+  const addInv=()=>{if(!form.cl)return;const rev=Number(form.rev)||0;const pd=Number(form.pd)||0;setInvoices(p=>[{cl:form.cl,v:form.v,rev,pd,du:rev-pd},...p]);setForm({cl:"",v:"",rev:"",pd:""});setShowAdd(false);};
+  const delInv=(i)=>{const idx=invoices.indexOf(list[i]);if(idx>=0)setInvoices(p=>p.filter((_,j)=>j!==idx));};
   return <div style={{display:"flex",flexDirection:"column",gap:16}}>
     <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-      <KPI label="Total revenue" value={fmt(S.rev)+" AED"} sub={FIN.length+" invoices"} pos/>
-      <KPI label="Collected" value={fmt(S.paid)+" AED"} sub={(S.paid/S.rev*100).toFixed(0)+"% rate"} pos/>
-      <KPI label="Outstanding" value={fmt(S.due)+" AED"} pos={S.due===0}/>
-      <KPI label="Avg deal" value={fmt(S.rev/FIN.length)+" AED"} pos/>
+      <KPI label="Total revenue" value={fmt(totalRev)+" AED"} sub={invoices.length+" invoices"} pos/>
+      <KPI label="Collected" value={fmt(totalPd)+" AED"} sub={totalRev?(totalPd/totalRev*100).toFixed(0)+"% rate":"0%"} pos/>
+      <KPI label="Outstanding" value={fmt(totalDue)+" AED"} pos={totalDue===0}/>
+      <KPI label="Avg deal" value={invoices.length?fmt(totalRev/invoices.length)+" AED":"0"} pos/>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
       <Card><CH title="Revenue by vertical"/><div style={{padding:"6px 18px"}}>{topV.map(([v,amt],i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid "+t.border}}>
@@ -184,12 +216,15 @@ function CashPage(){
         <div style={{flex:2,height:6,background:t.border,borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",background:t.teal,borderRadius:3,width:(amt/mxV*100)+"%"}}/></div>
         <div style={{minWidth:50,textAlign:"right",fontSize:12,fontWeight:600,color:t.tw}}>{fmt(amt)}</div>
       </div>)}</div></Card>
-      <Card><CH title="Top clients"/><div style={{padding:"6px 18px"}}>{Object.entries(S.topCl).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([cl,v],i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid "+t.border}}>
+      <Card><CH title="Top clients"/><div style={{padding:"6px 18px"}}>{Object.entries(topCl).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([cl,v],i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid "+t.border}}>
         <div style={{fontSize:12,fontWeight:500,color:t.tw}}>{cl}</div><div style={{fontSize:12,fontWeight:600,color:t.green}}>{fmt(v)}</div>
       </div>)}</div></Card>
     </div>
     <Card>
-      <CH title={`Invoices (${list.length})`} right={<input placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{background:t.bg,border:"1px solid "+t.border,borderRadius:6,padding:"5px 10px",color:t.text,fontSize:12,width:160,outline:"none"}}/>}/>
+      <CH title={`Invoices (${list.length})`} right={<div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <FormBtn label="+ Add invoice" onClick={()=>setShowAdd(true)} color={t.green}/>
+        <input placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{background:t.bg,border:"1px solid "+t.border,borderRadius:6,padding:"5px 10px",color:t.text,fontSize:12,width:160,outline:"none"}}/>
+      </div>}/>
       <div style={{maxHeight:350,overflow:"auto"}}>
         {list.map((f,i)=><div key={i} style={{display:"flex",alignItems:"center",padding:"9px 18px",borderBottom:"1px solid "+t.border,gap:12,fontSize:13}}>
           <div style={{flex:2,fontWeight:500,color:t.tw}}>{f.cl}</div>
@@ -197,9 +232,17 @@ function CashPage(){
           <div style={{width:70,textAlign:"right",color:t.green,fontWeight:600}}>{f.rev.toLocaleString()}</div>
           <div style={{width:70,textAlign:"right",color:t.text}}>{f.pd.toLocaleString()}</div>
           <div style={{width:60,textAlign:"right",color:f.du>0?t.red:t.td,fontWeight:f.du>0?600:400}}>{f.du>0?f.du.toLocaleString():"\u2014"}</div>
+          <DelBtn onClick={()=>delInv(i)}/>
         </div>)}
       </div>
     </Card>
+    <Modal open={showAdd} onClose={()=>setShowAdd(false)} title="Add new invoice">
+      <FormField label="Client" value={form.cl} onChange={v=>setForm(p=>({...p,cl:v}))}/>
+      <FormField label="Vertical" value={form.v} onChange={v=>setForm(p=>({...p,v:v}))}/>
+      <FormField label="Revenue (AED)" value={form.rev} onChange={v=>setForm(p=>({...p,rev:v}))} type="number"/>
+      <FormField label="Amount paid (AED)" value={form.pd} onChange={v=>setForm(p=>({...p,pd:v}))} type="number"/>
+      <div style={{marginTop:8}}><FormBtn label="Add invoice" onClick={addInv}/></div>
+    </Modal>
   </div>;
 }
 
@@ -208,28 +251,43 @@ function QuotPage(){
   const t=useContext(ThemeCtx);
   const [filter,setFilter]=useState("All");
   const [search,setSearch]=useState("");
+  const [showAdd,setShowAdd]=useState(false);
+  const [quots,setQuots]=useState(QUOT);
+  const [form,setForm]=useState({cl:"",st:"Pending"});
   const sts=["All","Awarded","Dropped","Lost","Pending"];
-  let list=QUOT;if(filter!=="All")list=list.filter(q=>q.st===filter);
+  const qst={};quots.forEach(q=>qst[q.st]=(qst[q.st]||0)+1);
+  let list=quots;if(filter!=="All")list=list.filter(q=>q.st===filter);
   if(search)list=list.filter(q=>q.cl.toLowerCase().includes(search.toLowerCase()));
+  const addQ=()=>{if(!form.cl)return;setQuots(p=>[{...form},...p]);setForm({cl:"",st:"Pending"});setShowAdd(false);};
+  const delQ=(i)=>{const idx=quots.indexOf(list[i]);if(idx>=0)setQuots(p=>p.filter((_,j)=>j!==idx));};
   return <div style={{display:"flex",flexDirection:"column",gap:16}}>
     <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-      <KPI label="Total" value={QUOT.length} pos/>
-      <KPI label="Awarded" value={S.qst.Awarded||0} sub={((S.qst.Awarded||0)/QUOT.length*100).toFixed(0)+"% win rate"} pos/>
-      <KPI label="Dropped" value={S.qst.Dropped||0} pos={false}/>
-      <KPI label="Pending" value={S.qst.Pending||0} sub="Active" pos/>
+      <KPI label="Total" value={quots.length} pos/>
+      <KPI label="Awarded" value={qst.Awarded||0} sub={quots.length?((qst.Awarded||0)/quots.length*100).toFixed(0)+"% win rate":"0%"} pos/>
+      <KPI label="Dropped" value={qst.Dropped||0} pos={false}/>
+      <KPI label="Pending" value={qst.Pending||0} sub="Active" pos/>
     </div>
     <Card>
       <CH title={`Quotations (${list.length})`} right={<div style={{display:"flex",gap:3,alignItems:"center"}}>
+        <FormBtn label="+ Add quotation" onClick={()=>setShowAdd(true)} color={t.green}/>
         <input placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{background:t.bg,border:"1px solid "+t.border,borderRadius:6,padding:"5px 10px",color:t.text,fontSize:12,width:130,outline:"none",marginRight:6}}/>
         {sts.map(s=><Btn key={s} active={filter===s} label={s} onClick={()=>setFilter(s)}/>)}
       </div>}/>
       <div style={{maxHeight:460,overflow:"auto"}}>
         {list.map((q,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 18px",borderBottom:"1px solid "+t.border}}>
           <div style={{fontSize:13,fontWeight:500,color:t.tw}}>{q.cl}</div>
-          <Pill color={q.st==="Awarded"?t.green:q.st==="Dropped"?t.td:q.st==="Lost"?t.red:t.amber}>{q.st}</Pill>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <Pill color={q.st==="Awarded"?t.green:q.st==="Dropped"?t.td:q.st==="Lost"?t.red:t.amber}>{q.st}</Pill>
+            <DelBtn onClick={()=>delQ(i)}/>
+          </div>
         </div>)}
       </div>
     </Card>
+    <Modal open={showAdd} onClose={()=>setShowAdd(false)} title="Add quotation">
+      <FormField label="Client" value={form.cl} onChange={v=>setForm(p=>({...p,cl:v}))}/>
+      <FormField label="Status" value={form.st} onChange={v=>setForm(p=>({...p,st:v}))} options={["Pending","Awarded","Dropped","Lost"]}/>
+      <div style={{marginTop:8}}><FormBtn label="Add quotation" onClick={addQ}/></div>
+    </Modal>
   </div>;
 }
 
