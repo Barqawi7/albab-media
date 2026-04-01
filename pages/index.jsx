@@ -466,7 +466,116 @@ function ExpPage({exp,rl}){
   );
 }
 
-const NAV=[{k:"dash",l:"Dashboard",i:"\u25A3"},{k:"sales",l:"Sales",i:"\u26A1"},{k:"inf",l:"Influencers",i:"\u2605"},{k:"cash",l:"Cash flow",i:"$"},{k:"quot",l:"Quotations",i:"\u2611"},{k:"exp",l:"Expenses",i:"\u2699"}];
+function ContactsPage(){
+  const t=useContext(Ctx);
+  const[rows,setRows]=useState([]);
+  const[total,setTotal]=useState(0);
+  const[se,sse]=useState("");
+  const[query,setQuery]=useState("");
+  const[page,setPage]=useState(0);
+  const[loading,setLoading]=useState(true);
+  const[mo,smo]=useState(false);
+  const[er,ser]=useState(null);
+  const[sv,ssv]=useState(false);
+  const PER=250;
+  const dF={name:"",company:"",title:"",email:"",phone:"",industry:"",city:"Dubai"};
+  const[fo,sfo]=useState(dF);
+
+  const fetch=useCallback(async(q,pg)=>{
+    setLoading(true);
+    let qb=supabase.from("contacts").select("*",{count:"exact"});
+    if(q){qb=qb.or("name.ilike.%"+q+"%,company.ilike.%"+q+"%,email.ilike.%"+q+"%,industry.ilike.%"+q+"%")}
+    qb=qb.order("id").range(pg*PER,(pg+1)*PER-1);
+    const{data,count}=await qb;
+    setRows(data||[]);
+    if(count!==null)setTotal(count);
+    setLoading(false);
+  },[]);
+
+  useEffect(()=>{fetch(query,page)},[query,page,fetch]);
+
+  const doSearch=()=>{setPage(0);setQuery(se)};
+  const openAdd=()=>{ser(null);sfo(dF);smo(true)};
+  const openEdit=r=>{ser(r);sfo({name:r.name||"",company:r.company||"",title:r.title||"",email:r.email||"",phone:r.phone||"",industry:r.industry||"",city:r.city||""});smo(true)};
+  const save=async()=>{if(!fo.name.trim())return;ssv(true);if(er){await supabase.from("contacts").update(fo).eq("id",er.id)}else{await supabase.from("contacts").insert([fo])}ssv(false);smo(false);ser(null);sfo(dF);fetch(query,page)};
+  const del=async id=>{if(!confirm("Delete?"))return;await supabase.from("contacts").delete().eq("id",id);fetch(query,page)};
+
+  const pages=Math.ceil(total/PER);
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+        <KPI l="Total contacts" v={total.toLocaleString()} s="B2B database" p/>
+        <KPI l="Showing" v={rows.length.toLocaleString()} s={"Page "+(page+1)+" of "+pages} p/>
+      </div>
+      <Card>
+        <CH title={"Contacts ("+total.toLocaleString()+")"} right={
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <input
+              placeholder="Search name, company, email..."
+              value={se}
+              onChange={e=>sse(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&doSearch()}
+              style={{background:t.bg,border:"1px solid "+t.bd,borderRadius:6,padding:"5px 10px",color:t.tx,fontSize:12,width:220,outline:"none"}}
+            />
+            <button onClick={doSearch} style={{padding:"5px 12px",borderRadius:6,border:"none",background:t.bl,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>Search</button>
+            {query&&<button onClick={()=>{sse("");setQuery("");setPage(0)}} style={{padding:"5px 10px",borderRadius:6,border:"none",background:"transparent",color:t.tm,fontSize:12,cursor:"pointer"}}>Clear</button>}
+            <AB onClick={openAdd} l="+ Add"/>
+          </div>
+        }/>
+        {/* Table header */}
+        <div style={{display:"flex",padding:"7px 18px",borderBottom:"1px solid "+t.bd,fontSize:11,color:t.td,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>
+          <div style={{flex:2}}>Name</div>
+          <div style={{flex:2}}>Company</div>
+          <div style={{flex:1.5}}>Title</div>
+          <div style={{flex:2}}>Email</div>
+          <div style={{flex:1}}>Phone</div>
+          <div style={{flex:1}}>Industry</div>
+          <div style={{flex:1}}>City</div>
+          <div style={{width:60}}></div>
+        </div>
+        <div style={{maxHeight:500,overflow:"auto"}}>
+          {loading?(
+            <div style={{padding:40,textAlign:"center",color:t.td}}>Loading...</div>
+          ):rows.length===0?(
+            <div style={{padding:40,textAlign:"center",color:t.td}}>No contacts found</div>
+          ):rows.map((c,i)=>(
+            <div key={c.id||i} style={{display:"flex",alignItems:"center",padding:"9px 18px",borderBottom:"1px solid "+t.bd,fontSize:12,gap:4}} onMouseEnter={e=>e.currentTarget.style.background=t.s3} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <div style={{flex:2,fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name||"—"}</div>
+              <div style={{flex:2,color:t.tm,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.company||"—"}</div>
+              <div style={{flex:1.5,color:t.td,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.title||"—"}</div>
+              <div style={{flex:2,color:t.bl,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.email||"—"}</div>
+              <div style={{flex:1,color:t.tm,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.phone||"—"}</div>
+              <div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><Pill c={t.pr}>{c.industry||"—"}</Pill></div>
+              <div style={{flex:1,color:t.td,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.city||"—"}</div>
+              <div style={{width:60,display:"flex",gap:2,flexShrink:0}}><EB onClick={()=>openEdit(c)}/><DB onClick={()=>del(c.id)}/></div>
+            </div>
+          ))}
+        </div>
+        {/* Pagination */}
+        {pages>1&&(
+          <div style={{padding:"10px 18px",borderTop:"1px solid "+t.bd,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} style={{padding:"5px 14px",borderRadius:6,border:"1px solid "+t.bd,background:"transparent",color:page===0?t.td:t.tw,cursor:page===0?"not-allowed":"pointer",fontSize:12}}>&#8592; Prev</button>
+            <span style={{fontSize:12,color:t.td}}>Page {page+1} of {pages} &nbsp;&middot;&nbsp; {total.toLocaleString()} total</span>
+            <button onClick={()=>setPage(p=>Math.min(pages-1,p+1))} disabled={page>=pages-1} style={{padding:"5px 14px",borderRadius:6,border:"1px solid "+t.bd,background:"transparent",color:page>=pages-1?t.td:t.tw,cursor:page>=pages-1?"not-allowed":"pointer",fontSize:12}}>Next &#8594;</button>
+          </div>
+        )}
+      </Card>
+      <Modal open={mo} onClose={()=>smo(false)} title={er?"Edit contact":"Add contact"}>
+        <F l="Name" v={fo.name} onChange={v=>sfo({...fo,name:v})}/>
+        <F l="Company" v={fo.company} onChange={v=>sfo({...fo,company:v})}/>
+        <F l="Title" v={fo.title} onChange={v=>sfo({...fo,title:v})}/>
+        <F l="Email" v={fo.email} onChange={v=>sfo({...fo,email:v})}/>
+        <F l="Phone" v={fo.phone} onChange={v=>sfo({...fo,phone:v})}/>
+        <F l="Industry" v={fo.industry} onChange={v=>sfo({...fo,industry:v})}/>
+        <F l="City" v={fo.city} onChange={v=>sfo({...fo,city:v})}/>
+        <SB onClick={save} loading={sv}/>
+      </Modal>
+    </div>
+  );
+}
+
+const NAV=[{k:"dash",l:"Dashboard",i:"\u25A3"},{k:"sales",l:"Sales",i:"\u26A1"},{k:"inf",l:"Influencers",i:"\u2605"},{k:"cash",l:"Cash flow",i:"$"},{k:"quot",l:"Quotations",i:"\u2611"},{k:"exp",l:"Expenses",i:"\u2699"},{k:"contacts",l:"Contacts",i:"\u260E"}];
 
 export default function App(){
   const[mode,setMode]=useState("dark");const[active,setActive]=useState("dash");const[loading,setLoading]=useState(true);
@@ -492,7 +601,7 @@ export default function App(){
     inf:<InfPage inf={data.inf} rl={load}/>,
     cash:<CashPage inv={data.inv} rl={load}/>,
     quot:<QuotPage qt={data.qt} rl={load}/>,
-    exp:<ExpPage exp={data.exp} rl={load}/>
+    contacts:<ContactsPage/>
   };
   return(
     <Ctx.Provider value={t}>
