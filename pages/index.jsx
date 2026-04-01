@@ -6,7 +6,7 @@ const D={bg:"#060A13",s1:"#0C1220",s2:"#111827",s3:"#1A2332",bd:"#1E293B",tx:"#E
 const L={bg:"#F8FAFC",s1:"#FFF",s2:"#F1F5F9",s3:"#E2E8F0",bd:"#E2E8F0",tx:"#1E293B",tm:"#64748B",td:"#94A3B8",tw:"#0F172A",bl:"#3B82F6",bG:"rgba(59,130,246,.08)",gn:"#059669",gG:"rgba(5,150,105,.08)",am:"#D97706",aG:"rgba(217,119,6,.08)",rd:"#DC2626",rG:"rgba(220,38,38,.08)",pr:"#7C3AED",pG:"rgba(124,58,237,.08)",tl:"#0D9488",tG:"rgba(13,148,136,.08)",pk:"#DB2777"};
 const STG=["Prospect","Funnel","Upside","Commit","Awarded","Lost","Dropped"];
 const sC=s=>({"Prospect":"#94A3B8","Funnel":"#60A5FA","Upside":"#A78BFA","Commit":"#F59E0B","Awarded":"#10B981","Lost":"#EF4444","Dropped":"#6B7280"}[s]||"#94A3B8");
-const fm=n=>n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(0)+"K":String(Math.round(n));
+const fm=n=>Number(n||0).toLocaleString();
 
 function Pill({children,c}){const t=useContext(Ctx);return <span style={{padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:(c||t.bl)+"1F",color:c||t.bl}}>{children}</span>}
 function KPI({l,v,s,p=true}){const t=useContext(Ctx);return <div style={{background:t.s1,borderRadius:14,padding:"16px 18px",border:"1px solid "+t.bd,flex:1,minWidth:150}}><div style={{fontSize:11,color:t.td,textTransform:"uppercase",letterSpacing:1,marginBottom:6,fontWeight:600}}>{l}</div><div style={{fontSize:22,fontWeight:700,color:t.tw}}>{v}</div>{s&&<div style={{marginTop:5,fontSize:12,color:p?t.gn:t.am}}>{s}</div>}</div>}
@@ -14,8 +14,8 @@ function Card({children,style={}}){const t=useContext(Ctx);return <div style={{b
 function CH({title,right}){const t=useContext(Ctx);return <div style={{padding:"14px 18px",borderBottom:"1px solid "+t.bd,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}><div style={{fontSize:14,fontWeight:600,color:t.tw}}>{title}</div>{right}</div>}
 function Btn({a,l,onClick}){const t=useContext(Ctx);return <button onClick={onClick} style={{padding:"4px 12px",borderRadius:6,border:"none",background:a?t.bl:"transparent",color:a?"#fff":t.tm,fontSize:12,fontWeight:500,cursor:"pointer"}}>{l}</button>}
 function AB({onClick,l="+ Add"}){const t=useContext(Ctx);return <button onClick={onClick} style={{padding:"6px 14px",borderRadius:8,border:"none",background:t.gn,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>{l}</button>}
-function DB({onClick}){return <button onClick={onClick} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"transparent",color:"#EF4444",fontSize:13,cursor:"pointer",opacity:.45,lineHeight:1}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.45}>&#x2715;</button>}
-function EB({onClick}){return <button onClick={onClick} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"transparent",color:"#60A5FA",fontSize:13,cursor:"pointer",opacity:.45,lineHeight:1}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.45}>&#x270E;</button>}
+function DB({onClick}){return <button onClick={onClick} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"transparent",color:"#EF4444",fontSize:13,cursor:"pointer",opacity:.45,lineHeight:1}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.45}>{"\u2715"}</button>}
+function EB({onClick}){return <button onClick={onClick} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"transparent",color:"#60A5FA",fontSize:13,cursor:"pointer",opacity:.45,lineHeight:1}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.45}>{"\u270E"}</button>}
 
 function VBar({data,h=130}){
   const t=useContext(Ctx);
@@ -137,7 +137,7 @@ function GroupBar({labels,groups,h=130}){
   );
 }
 
-function Modal({open,onClose,title,children}){const t=useContext(Ctx);if(!open)return null;return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999}} onClick={onClose}><div onClick={e=>e.stopPropagation()} style={{background:t.s1,borderRadius:16,border:"1px solid "+t.bd,padding:24,width:440,maxHeight:"80vh",overflow:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:18,fontWeight:700,color:t.tw}}>{title}</div><div onClick={onClose} style={{cursor:"pointer",color:t.td,fontSize:20}}>&times;</div></div>{children}</div></div>}
+function Modal({open,onClose,title,children}){const t=useContext(Ctx);if(!open)return null;return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999}} onClick={onClose}><div onClick={e=>e.stopPropagation()} style={{background:t.s1,borderRadius:16,border:"1px solid "+t.bd,padding:24,width:440,maxHeight:"80vh",overflow:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:18,fontWeight:700,color:t.tw}}>{title}</div><div onClick={onClose} style={{cursor:"pointer",color:t.td,fontSize:20}}>{"\u00D7"}</div></div>{children}</div></div>}
 function F({l,v,onChange,type="text",opts}){const t=useContext(Ctx);return <div style={{marginBottom:12}}><div style={{fontSize:12,color:t.tm,marginBottom:4}}>{l}</div>{opts?<select value={v} onChange={e=>onChange(e.target.value)} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid "+t.bd,background:t.s2,color:t.tx,fontSize:13}}>{opts.map(o=><option key={o} value={o}>{o}</option>)}</select>:<input type={type} value={v} onChange={e=>onChange(e.target.value)} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid "+t.bd,background:t.s2,color:t.tx,fontSize:13,outline:"none",boxSizing:"border-box"}}/>}</div>}
 function SB({onClick,loading}){const t=useContext(Ctx);return <button onClick={onClick} disabled={loading} style={{width:"100%",padding:"10px",borderRadius:8,border:"none",background:t.bl,color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer",marginTop:8,opacity:loading?.6:1}}>{loading?"Saving...":"Save"}</button>}
 
@@ -311,7 +311,7 @@ function CashPage({inv,rl}){
               <div style={{flex:1,color:t.tm,fontSize:12}}>{f.vertical}</div>
               <div style={{width:70,textAlign:"right",color:t.gn,fontWeight:600}}>{(f.revenue||0).toLocaleString()}</div>
               <div style={{width:70,textAlign:"right",color:t.tx}}>{(f.amount_paid||0).toLocaleString()}</div>
-              <div style={{width:55,textAlign:"right",color:(f.revenue-f.amount_paid)>0?t.rd:t.td,fontWeight:600}}>{(f.revenue-f.amount_paid)>0?(f.revenue-f.amount_paid).toLocaleString():"&#8212;"}</div>
+              <div style={{width:55,textAlign:"right",color:(f.revenue-f.amount_paid)>0?t.rd:t.td,fontWeight:600}}>{(f.revenue-f.amount_paid)>0?(f.revenue-f.amount_paid).toLocaleString():"\u2014"}</div>
               {f.id&&<><EB onClick={()=>openEdit(f)}/><DB onClick={()=>del(f.id)}/></>}
             </div>
           ))}
@@ -359,7 +359,7 @@ function InfPage({inf,rl}){
           {ls.map((n,i)=>(
             <div key={n.id||i} style={{display:"flex",alignItems:"center",padding:"10px 18px",borderBottom:"1px solid "+t.bd,gap:10,fontSize:13}} onMouseEnter={e=>e.currentTarget.style.background=t.s3} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
               <div style={{width:34,height:34,borderRadius:"50%",background:(tC[n.tier]||t.td)+"1F",display:"flex",alignItems:"center",justifyContent:"center",color:tC[n.tier],fontWeight:700,fontSize:14,flexShrink:0}}>{(n.name||"?")[0]}</div>
-              <div style={{flex:2,minWidth:0}}><div style={{fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.name}</div><div style={{fontSize:11,color:t.td}}>{n.handle} &middot; {n.category}</div></div>
+              <div style={{flex:2,minWidth:0}}><div style={{fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.name}</div><div style={{fontSize:11,color:t.td}}>{n.handle} {"\u00B7"} {n.category}</div></div>
               <div style={{width:55,textAlign:"right",fontSize:12,color:t.pk,fontWeight:600}}>{n.ig_followers}</div>
               <div style={{width:55,textAlign:"right",fontSize:12,color:t.tl,fontWeight:600}}>{n.tiktok_followers}</div>
               <div style={{width:55,textAlign:"right",fontSize:12,color:t.rd,fontWeight:600}}>{n.youtube_followers}</div>
@@ -466,7 +466,7 @@ function ExpPage({exp,rl}){
   );
 }
 
-const NAV=[{k:"dash",l:"Dashboard",i:"&#9635;"},{k:"sales",l:"Sales",i:"&#9889;"},{k:"inf",l:"Influencers",i:"&#9733;"},{k:"cash",l:"Cash flow",i:"$"},{k:"quot",l:"Quotations",i:"&#9745;"},{k:"exp",l:"Expenses",i:"&#9881;"}];
+const NAV=[{k:"dash",l:"Dashboard",i:"\u25A3"},{k:"sales",l:"Sales",i:"\u26A1"},{k:"inf",l:"Influencers",i:"\u2605"},{k:"cash",l:"Cash flow",i:"$"},{k:"quot",l:"Quotations",i:"\u2611"},{k:"exp",l:"Expenses",i:"\u2699"}];
 
 export default function App(){
   const[mode,setMode]=useState("dark");const[active,setActive]=useState("dash");const[loading,setLoading]=useState(true);
