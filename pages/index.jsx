@@ -14,9 +14,10 @@ function Card({children,style={}}){const t=useContext(Ctx);return <div style={{b
 function CH({title,right}){const t=useContext(Ctx);return <div style={{padding:"14px 18px",borderBottom:"1px solid "+t.bd,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}><div style={{fontSize:14,fontWeight:600,color:t.tw}}>{title}</div>{right}</div>}
 function Btn({a,l,onClick}){const t=useContext(Ctx);return <button onClick={onClick} style={{padding:"4px 12px",borderRadius:6,border:"none",background:a?t.bl:"transparent",color:a?"#fff":t.tm,fontSize:12,fontWeight:500,cursor:"pointer"}}>{l}</button>}
 function AB({onClick,l="+ Add"}){const t=useContext(Ctx);return <button onClick={onClick} style={{padding:"6px 14px",borderRadius:8,border:"none",background:t.gn,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>{l}</button>}
-function DB({onClick}){return <button onClick={onClick} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"transparent",color:"#EF4444",fontSize:11,cursor:"pointer",opacity:.5}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.5}>x</button>}
+function DB({onClick}){return <button onClick={onClick} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"transparent",color:"#EF4444",fontSize:13,cursor:"pointer",opacity:.45,lineHeight:1}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.45}>✕</button>}
+function EB({onClick}){return <button onClick={onClick} style={{padding:"2px 8px",borderRadius:4,border:"none",background:"transparent",color:"#60A5FA",fontSize:13,cursor:"pointer",opacity:.45,lineHeight:1}} onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=.45}>✎</button>}
 
-function Modal({open,onClose,title,children}){const t=useContext(Ctx);if(!open)return null;return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999}} onClick={onClose}><div onClick={e=>e.stopPropagation()} style={{background:t.s1,borderRadius:16,border:"1px solid "+t.bd,padding:24,width:440,maxHeight:"80vh",overflow:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:18,fontWeight:700,color:t.tw}}>{title}</div><div onClick={onClose} style={{cursor:"pointer",color:t.td,fontSize:20}}>\u00D7</div></div>{children}</div></div>}
+function Modal({open,onClose,title,children}){const t=useContext(Ctx);if(!open)return null;return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999}} onClick={onClose}><div onClick={e=>e.stopPropagation()} style={{background:t.s1,borderRadius:16,border:"1px solid "+t.bd,padding:24,width:440,maxHeight:"80vh",overflow:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:18,fontWeight:700,color:t.tw}}>{title}</div><div onClick={onClose} style={{cursor:"pointer",color:t.td,fontSize:20}}>×</div></div>{children}</div></div>}
 function F({l,v,onChange,type="text",opts}){const t=useContext(Ctx);return <div style={{marginBottom:12}}><div style={{fontSize:12,color:t.tm,marginBottom:4}}>{l}</div>{opts?<select value={v} onChange={e=>onChange(e.target.value)} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid "+t.bd,background:t.s2,color:t.tx,fontSize:13}}>{opts.map(o=><option key={o} value={o}>{o}</option>)}</select>:<input type={type} value={v} onChange={e=>onChange(e.target.value)} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid "+t.bd,background:t.s2,color:t.tx,fontSize:13,outline:"none",boxSizing:"border-box"}}/>}</div>}
 function SB({onClick,loading}){const t=useContext(Ctx);return <button onClick={onClick} disabled={loading} style={{width:"100%",padding:"10px",borderRadius:8,border:"none",background:t.bl,color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer",marginTop:8,opacity:loading?.6:1}}>{loading?"Saving...":"Save"}</button>}
 
@@ -29,94 +30,124 @@ return <div style={{display:"flex",flexDirection:"column",gap:16}}>
 <Card><CH title={"Quotations ("+qt.length+")"}/><div style={{padding:"6px 18px"}}>{Object.entries(qs).sort((a,b)=>b[1]-a[1]).map(([st,c],i)=><div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid "+t.bd}}><Pill c={st==="Awarded"?t.gn:st==="Dropped"?t.td:st==="Lost"?t.rd:t.am}>{st}</Pill><div style={{flex:1}}/><div style={{fontSize:20,fontWeight:700,color:t.tw}}>{c}</div></div>)}</div></Card>
 </div></div>}
 
-function SalesPage({ld,rl}){const t=useContext(Ctx);const[fi,sfi]=useState("All");const[se,sse]=useState("");const[mo,smo]=useState(false);const[fo,sfo]=useState({client:"",vertical:"",contact_person:"",email:"",stage:"Prospect"});const[sv,ssv]=useState(false);
+function SalesPage({ld,rl}){
+const t=useContext(Ctx);
+const[fi,sfi]=useState("All");const[se,sse]=useState("");const[mo,smo]=useState(false);
+const dF={client:"",vertical:"",contact_person:"",email:"",stage:"Prospect"};
+const[fo,sfo]=useState(dF);const[sv,ssv]=useState(false);const[er,ser]=useState(null);
 let ls=ld;if(fi!=="All")ls=ls.filter(s=>s.stage===fi);if(se)ls=ls.filter(s=>(s.client+s.contact_person+s.vertical).toLowerCase().includes(se.toLowerCase()));
 const pi={};ld.forEach(l=>pi[l.stage]=(pi[l.stage]||0)+1);
-const save=async()=>{if(!fo.client.trim())return;ssv(true);await supabase.from("leads").insert([fo]);ssv(false);smo(false);sfo({client:"",vertical:"",contact_person:"",email:"",stage:"Prospect"});rl()};
+const openAdd=()=>{ser(null);sfo(dF);smo(true)};
+const openEdit=r=>{ser(r);sfo({client:r.client||"",vertical:r.vertical||"",contact_person:r.contact_person||"",email:r.email||"",stage:r.stage||"Prospect"});smo(true)};
+const save=async()=>{if(!fo.client.trim())return;ssv(true);if(er){await supabase.from("leads").update(fo).eq("id",er.id)}else{await supabase.from("leads").insert([fo])}ssv(false);smo(false);ser(null);sfo(dF);rl()};
 const del=async id=>{if(!confirm("Delete?"))return;await supabase.from("leads").delete().eq("id",id);rl()};
 return <div style={{display:"flex",flexDirection:"column",gap:16}}>
 <div style={{display:"flex",gap:12,flexWrap:"wrap"}}><KPI l="Total" v={ld.length} s={(pi.Awarded||0)+" awarded"} p/><KPI l="Active" v={(pi.Prospect||0)+(pi.Funnel||0)+(pi.Upside||0)} s="In pipeline" p/><KPI l="Win rate" v={ld.length?((pi.Awarded||0)/ld.length*100).toFixed(0)+"%":"0%"} p/><KPI l="Lost+Drop" v={(pi.Lost||0)+(pi.Dropped||0)} p={false}/></div>
-<Card><CH title={"Leads ("+ls.length+")"} right={<div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}><input placeholder="Search..." value={se} onChange={e=>sse(e.target.value)} style={{background:t.bg,border:"1px solid "+t.bd,borderRadius:6,padding:"5px 10px",color:t.tx,fontSize:12,width:120,outline:"none"}}/>{["All",...STG].map(s=><Btn key={s} a={fi===s} l={s} onClick={()=>sfi(s)}/>)}<AB onClick={()=>smo(true)} l="+ Add"/></div>}/>
-<div style={{maxHeight:460,overflow:"auto"}}>{ls.map((s,i)=><div key={s.id||i} style={{display:"flex",alignItems:"center",padding:"10px 18px",borderBottom:"1px solid "+t.bd,gap:12,fontSize:13}} onMouseEnter={e=>e.currentTarget.style.background=t.s3} onMouseLeave={e=>e.currentTarget.style.background="transparent"}}>
+<Card><CH title={"Leads ("+ls.length+")"} right={<div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}><input placeholder="Search..." value={se} onChange={e=>sse(e.target.value)} style={{background:t.bg,border:"1px solid "+t.bd,borderRadius:6,padding:"5px 10px",color:t.tx,fontSize:12,width:120,outline:"none"}}/>{["All",...STG].map(s=><Btn key={s} a={fi===s} l={s} onClick={()=>sfi(s)}/>)}<AB onClick={openAdd} l="+ Add"/></div>}/>
+<div style={{maxHeight:460,overflow:"auto"}}>{ls.map((s,i)=><div key={s.id||i} style={{display:"flex",alignItems:"center",padding:"10px 18px",borderBottom:"1px solid "+t.bd,gap:12,fontSize:13}} onMouseEnter={e=>e.currentTarget.style.background=t.s3} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
 <div style={{width:32,height:32,borderRadius:8,background:sC(s.stage)+"1F",display:"flex",alignItems:"center",justifyContent:"center",color:sC(s.stage),fontWeight:700,fontSize:13,flexShrink:0}}>{(s.client||"?")[0]}</div>
-<div style={{flex:2,minWidth:0}}><div style={{fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.client}</div><div style={{fontSize:11,color:t.td}}>{s.contact_person}{s.vertical?" \u00B7 "+s.vertical:""}</div></div>
+<div style={{flex:2,minWidth:0}}><div style={{fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.client}</div><div style={{fontSize:11,color:t.td}}>{s.contact_person}{s.vertical?" · "+s.vertical:""}</div></div>
 <div style={{width:80}}><Pill c={sC(s.stage)}>{s.stage}</Pill></div>
-{s.id&&<DB onClick={()=>del(s.id)}/>}
+{s.id&&<><EB onClick={()=>openEdit(s)}/><DB onClick={()=>del(s.id)}/></>}
 </div>)}</div></Card>
-<Modal open={mo} onClose={()=>smo(false)} title="Add lead"><F l="Client" v={fo.client} onChange={v=>sfo({...fo,client:v})}/><F l="Vertical" v={fo.vertical} onChange={v=>sfo({...fo,vertical:v})}/><F l="Contact" v={fo.contact_person} onChange={v=>sfo({...fo,contact_person:v})}/><F l="Email" v={fo.email} onChange={v=>sfo({...fo,email:v})}/><F l="Stage" v={fo.stage} onChange={v=>sfo({...fo,stage:v})} opts={STG}/><SB onClick={save} loading={sv}/></Modal>
+<Modal open={mo} onClose={()=>smo(false)} title={er?"Edit lead":"Add lead"}><F l="Client" v={fo.client} onChange={v=>sfo({...fo,client:v})}/><F l="Vertical" v={fo.vertical} onChange={v=>sfo({...fo,vertical:v})}/><F l="Contact" v={fo.contact_person} onChange={v=>sfo({...fo,contact_person:v})}/><F l="Email" v={fo.email} onChange={v=>sfo({...fo,email:v})}/><F l="Stage" v={fo.stage} onChange={v=>sfo({...fo,stage:v})} opts={STG}/><SB onClick={save} loading={sv}/></Modal>
 </div>}
 
-function CashPage({inv,rl}){const t=useContext(Ctx);const[se,sse]=useState("");const[mo,smo]=useState(false);const[fo,sfo]=useState({client:"",vertical:"",revenue:0,amount_paid:0});const[sv,ssv]=useState(false);
+function CashPage({inv,rl}){
+const t=useContext(Ctx);
+const[se,sse]=useState("");const[mo,smo]=useState(false);
+const dF={client:"",vertical:"",revenue:0,amount_paid:0};
+const[fo,sfo]=useState(dF);const[sv,ssv]=useState(false);const[er,ser]=useState(null);
 let ls=inv;if(se)ls=ls.filter(f=>f.client.toLowerCase().includes(se.toLowerCase()));
 const tr=inv.reduce((a,f)=>a+(f.revenue||0),0);const tp=inv.reduce((a,f)=>a+(f.amount_paid||0),0);
 const vt={};inv.forEach(f=>vt[f.vertical||"Other"]=(vt[f.vertical||"Other"]||0)+(f.revenue||0));const tv=Object.entries(vt).sort((a,b)=>b[1]-a[1]).slice(0,8);const mx=tv[0]?.[1]||1;
-const save=async()=>{if(!fo.client.trim())return;ssv(true);const d={...fo,revenue:Number(fo.revenue),amount_paid:Number(fo.amount_paid),due_payment:Number(fo.revenue)-Number(fo.amount_paid)};await supabase.from("invoices").insert([d]);ssv(false);smo(false);sfo({client:"",vertical:"",revenue:0,amount_paid:0});rl()};
+const openAdd=()=>{ser(null);sfo(dF);smo(true)};
+const openEdit=r=>{ser(r);sfo({client:r.client||"",vertical:r.vertical||"",revenue:r.revenue||0,amount_paid:r.amount_paid||0});smo(true)};
+const save=async()=>{if(!fo.client.trim())return;ssv(true);const d={...fo,revenue:Number(fo.revenue),amount_paid:Number(fo.amount_paid),due_payment:Number(fo.revenue)-Number(fo.amount_paid)};if(er){await supabase.from("invoices").update(d).eq("id",er.id)}else{await supabase.from("invoices").insert([d])}ssv(false);smo(false);ser(null);sfo(dF);rl()};
 const del=async id=>{if(!confirm("Delete?"))return;await supabase.from("invoices").delete().eq("id",id);rl()};
 return <div style={{display:"flex",flexDirection:"column",gap:16}}>
 <div style={{display:"flex",gap:12,flexWrap:"wrap"}}><KPI l="Revenue" v={fm(tr)+" AED"} s={inv.length+" invoices"} p/><KPI l="Collected" v={fm(tp)+" AED"} s={tr?(tp/tr*100).toFixed(0)+"%":"0%"} p/><KPI l="Outstanding" v={fm(tr-tp)+" AED"} p={tr-tp===0}/></div>
 <Card><CH title="By vertical"/><div style={{padding:"6px 18px"}}>{tv.map(([v,a],i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid "+t.bd}}><div style={{flex:1,fontSize:12,color:t.tw}}>{v}</div><div style={{flex:2,height:6,background:t.bd,borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",background:t.tl,borderRadius:3,width:(a/mx*100)+"%"}}/></div><div style={{minWidth:50,textAlign:"right",fontSize:12,fontWeight:600,color:t.tw}}>{fm(a)}</div></div>)}</div></Card>
-<Card><CH title={"Invoices ("+ls.length+")"} right={<div style={{display:"flex",gap:6,alignItems:"center"}}><input placeholder="Search..." value={se} onChange={e=>sse(e.target.value)} style={{background:t.bg,border:"1px solid "+t.bd,borderRadius:6,padding:"5px 10px",color:t.tx,fontSize:12,width:150,outline:"none"}}/><AB onClick={()=>smo(true)} l="+ Add"/></div>}/>
+<Card><CH title={"Invoices ("+ls.length+")"} right={<div style={{display:"flex",gap:6,alignItems:"center"}}><input placeholder="Search..." value={se} onChange={e=>sse(e.target.value)} style={{background:t.bg,border:"1px solid "+t.bd,borderRadius:6,padding:"5px 10px",color:t.tx,fontSize:12,width:150,outline:"none"}}/><AB onClick={openAdd} l="+ Add"/></div>}/>
 <div style={{maxHeight:380,overflow:"auto"}}>{ls.map((f,i)=><div key={f.id||i} style={{display:"flex",alignItems:"center",padding:"9px 18px",borderBottom:"1px solid "+t.bd,gap:12,fontSize:13}}>
 <div style={{flex:2,fontWeight:500,color:t.tw}}>{f.client}</div><div style={{flex:1,color:t.tm,fontSize:12}}>{f.vertical}</div>
 <div style={{width:70,textAlign:"right",color:t.gn,fontWeight:600}}>{(f.revenue||0).toLocaleString()}</div>
 <div style={{width:70,textAlign:"right",color:t.tx}}>{(f.amount_paid||0).toLocaleString()}</div>
-<div style={{width:55,textAlign:"right",color:(f.revenue-f.amount_paid)>0?t.rd:t.td,fontWeight:600}}>{(f.revenue-f.amount_paid)>0?(f.revenue-f.amount_paid).toLocaleString():"\u2014"}</div>
-{f.id&&<DB onClick={()=>del(f.id)}/>}
+<div style={{width:55,textAlign:"right",color:(f.revenue-f.amount_paid)>0?t.rd:t.td,fontWeight:600}}>{(f.revenue-f.amount_paid)>0?(f.revenue-f.amount_paid).toLocaleString():"—"}</div>
+{f.id&&<><EB onClick={()=>openEdit(f)}/><DB onClick={()=>del(f.id)}/></>}
 </div>)}</div></Card>
-<Modal open={mo} onClose={()=>smo(false)} title="Add invoice"><F l="Client" v={fo.client} onChange={v=>sfo({...fo,client:v})}/><F l="Vertical" v={fo.vertical} onChange={v=>sfo({...fo,vertical:v})}/><F l="Revenue (AED)" v={fo.revenue} onChange={v=>sfo({...fo,revenue:v})} type="number"/><F l="Paid (AED)" v={fo.amount_paid} onChange={v=>sfo({...fo,amount_paid:v})} type="number"/><SB onClick={save} loading={sv}/></Modal>
+<Modal open={mo} onClose={()=>smo(false)} title={er?"Edit invoice":"Add invoice"}><F l="Client" v={fo.client} onChange={v=>sfo({...fo,client:v})}/><F l="Vertical" v={fo.vertical} onChange={v=>sfo({...fo,vertical:v})}/><F l="Revenue (AED)" v={fo.revenue} onChange={v=>sfo({...fo,revenue:v})} type="number"/><F l="Paid (AED)" v={fo.amount_paid} onChange={v=>sfo({...fo,amount_paid:v})} type="number"/><SB onClick={save} loading={sv}/></Modal>
 </div>}
 
-function InfPage({inf,rl}){const t=useContext(Ctx);const[ti,sti]=useState("All");const[se,sse]=useState("");const[mo,smo]=useState(false);const[fo,sfo]=useState({name:"",handle:"",category:"",city:"Dubai",nationality:"",ig_followers:"0",tiktok_followers:"0",youtube_followers:"0",total_reach:"0",engagement:0,tier:"Micro"});const[sv,ssv]=useState(false);
+function InfPage({inf,rl}){
+const t=useContext(Ctx);
+const[ti,sti]=useState("All");const[se,sse]=useState("");const[mo,smo]=useState(false);
+const dF={name:"",handle:"",category:"",city:"Dubai",nationality:"",ig_followers:"0",tiktok_followers:"0",youtube_followers:"0",total_reach:"0",engagement:0,tier:"Micro"};
+const[fo,sfo]=useState(dF);const[sv,ssv]=useState(false);const[er,ser]=useState(null);
 const tiers=["All","Mega","Macro","Mid","Micro"];const tC={Mega:t.pr,Macro:t.bl,Mid:t.tl,Micro:t.gn};
 let ls=inf;if(ti!=="All")ls=ls.filter(i=>i.tier===ti);if(se)ls=ls.filter(i=>(i.name+i.category+i.handle).toLowerCase().includes(se.toLowerCase()));
-const save=async()=>{if(!fo.name.trim())return;ssv(true);await supabase.from("influencers").insert([{...fo,engagement:Number(fo.engagement)}]);ssv(false);smo(false);sfo({name:"",handle:"",category:"",city:"Dubai",nationality:"",ig_followers:"0",tiktok_followers:"0",youtube_followers:"0",total_reach:"0",engagement:0,tier:"Micro"});rl()};
+const openAdd=()=>{ser(null);sfo(dF);smo(true)};
+const openEdit=r=>{ser(r);sfo({name:r.name||"",handle:r.handle||"",category:r.category||"",city:r.city||"Dubai",nationality:r.nationality||"",ig_followers:r.ig_followers||"0",tiktok_followers:r.tiktok_followers||"0",youtube_followers:r.youtube_followers||"0",total_reach:r.total_reach||"0",engagement:r.engagement||0,tier:r.tier||"Micro"});smo(true)};
+const save=async()=>{if(!fo.name.trim())return;ssv(true);const d={...fo,engagement:Number(fo.engagement)};if(er){await supabase.from("influencers").update(d).eq("id",er.id)}else{await supabase.from("influencers").insert([d])}ssv(false);smo(false);ser(null);sfo(dF);rl()};
 const del=async id=>{if(!confirm("Delete?"))return;await supabase.from("influencers").delete().eq("id",id);rl()};
 return <div style={{display:"flex",flexDirection:"column",gap:16}}>
 <div style={{display:"flex",gap:12,flexWrap:"wrap"}}><KPI l="Total" v={inf.length} s="Influencers" p/><KPI l="Avg engagement" v={inf.length?(inf.reduce((a,i)=>a+(i.engagement||0),0)/inf.length).toFixed(1)+"%":"0%"} p/></div>
-<Card><CH title={"Influencers ("+ls.length+")"} right={<div style={{display:"flex",gap:4,alignItems:"center"}}><input placeholder="Search..." value={se} onChange={e=>sse(e.target.value)} style={{background:t.bg,border:"1px solid "+t.bd,borderRadius:6,padding:"5px 10px",color:t.tx,fontSize:12,width:140,outline:"none"}}/>{tiers.map(x=><Btn key={x} a={ti===x} l={x} onClick={()=>sti(x)}/>)}<AB onClick={()=>smo(true)} l="+"/></div>}/>
+<Card><CH title={"Influencers ("+ls.length+")"} right={<div style={{display:"flex",gap:4,alignItems:"center"}}><input placeholder="Search..." value={se} onChange={e=>sse(e.target.value)} style={{background:t.bg,border:"1px solid "+t.bd,borderRadius:6,padding:"5px 10px",color:t.tx,fontSize:12,width:140,outline:"none"}}/>{tiers.map(x=><Btn key={x} a={ti===x} l={x} onClick={()=>sti(x)}/>)}<AB onClick={openAdd} l="+"/></div>}/>
 <div style={{maxHeight:460,overflow:"auto"}}>{ls.map((n,i)=><div key={n.id||i} style={{display:"flex",alignItems:"center",padding:"10px 18px",borderBottom:"1px solid "+t.bd,gap:10,fontSize:13}} onMouseEnter={e=>e.currentTarget.style.background=t.s3} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
 <div style={{width:34,height:34,borderRadius:"50%",background:(tC[n.tier]||t.td)+"1F",display:"flex",alignItems:"center",justifyContent:"center",color:tC[n.tier],fontWeight:700,fontSize:14,flexShrink:0}}>{(n.name||"?")[0]}</div>
-<div style={{flex:2,minWidth:0}}><div style={{fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.name}</div><div style={{fontSize:11,color:t.td}}>{n.handle} \u00B7 {n.category}</div></div>
+<div style={{flex:2,minWidth:0}}><div style={{fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.name}</div><div style={{fontSize:11,color:t.td}}>{n.handle} · {n.category}</div></div>
 <div style={{width:55,textAlign:"right",fontSize:12,color:t.pk,fontWeight:600}}>{n.ig_followers}</div>
 <div style={{width:55,textAlign:"right",fontSize:12,color:t.tl,fontWeight:600}}>{n.tiktok_followers}</div>
 <div style={{width:55,textAlign:"right",fontSize:12,color:t.rd,fontWeight:600}}>{n.youtube_followers}</div>
 <div style={{width:65,textAlign:"right",fontWeight:700,color:t.tw}}>{n.total_reach}</div>
 <div style={{width:42,textAlign:"right",color:(n.engagement||0)>=5?t.gn:(n.engagement||0)>=2?t.am:t.td,fontWeight:600,fontSize:12}}>{n.engagement}%</div>
 <Pill c={tC[n.tier]}>{n.tier}</Pill>
-{n.id&&<DB onClick={()=>del(n.id)}/>}
+{n.id&&<><EB onClick={()=>openEdit(n)}/><DB onClick={()=>del(n.id)}/></>}
 </div>)}</div></Card>
-<Modal open={mo} onClose={()=>smo(false)} title="Add influencer"><F l="Name" v={fo.name} onChange={v=>sfo({...fo,name:v})}/><F l="Handle" v={fo.handle} onChange={v=>sfo({...fo,handle:v})}/><F l="Category" v={fo.category} onChange={v=>sfo({...fo,category:v})}/><F l="City" v={fo.city} onChange={v=>sfo({...fo,city:v})}/><F l="IG followers" v={fo.ig_followers} onChange={v=>sfo({...fo,ig_followers:v})}/><F l="TikTok" v={fo.tiktok_followers} onChange={v=>sfo({...fo,tiktok_followers:v})}/><F l="YouTube" v={fo.youtube_followers} onChange={v=>sfo({...fo,youtube_followers:v})}/><F l="Engagement %" v={fo.engagement} onChange={v=>sfo({...fo,engagement:v})} type="number"/><F l="Tier" v={fo.tier} onChange={v=>sfo({...fo,tier:v})} opts={["Mega","Macro","Mid","Micro"]}/><SB onClick={save} loading={sv}/></Modal>
+<Modal open={mo} onClose={()=>smo(false)} title={er?"Edit influencer":"Add influencer"}><F l="Name" v={fo.name} onChange={v=>sfo({...fo,name:v})}/><F l="Handle" v={fo.handle} onChange={v=>sfo({...fo,handle:v})}/><F l="Category" v={fo.category} onChange={v=>sfo({...fo,category:v})}/><F l="City" v={fo.city} onChange={v=>sfo({...fo,city:v})}/><F l="IG followers" v={fo.ig_followers} onChange={v=>sfo({...fo,ig_followers:v})}/><F l="TikTok" v={fo.tiktok_followers} onChange={v=>sfo({...fo,tiktok_followers:v})}/><F l="YouTube" v={fo.youtube_followers} onChange={v=>sfo({...fo,youtube_followers:v})}/><F l="Engagement %" v={fo.engagement} onChange={v=>sfo({...fo,engagement:v})} type="number"/><F l="Tier" v={fo.tier} onChange={v=>sfo({...fo,tier:v})} opts={["Mega","Macro","Mid","Micro"]}/><SB onClick={save} loading={sv}/></Modal>
 </div>}
 
-function QuotPage({qt,rl}){const t=useContext(Ctx);const[fi,sfi]=useState("All");const[se,sse]=useState("");const[mo,smo]=useState(false);const[fo,sfo]=useState({client:"",status:"Pending"});const[sv,ssv]=useState(false);
+function QuotPage({qt,rl}){
+const t=useContext(Ctx);
+const[fi,sfi]=useState("All");const[se,sse]=useState("");const[mo,smo]=useState(false);
+const dF={client:"",status:"Pending"};
+const[fo,sfo]=useState(dF);const[sv,ssv]=useState(false);const[er,ser]=useState(null);
 const sts=["All","Awarded","Dropped","Lost","Pending"];let ls=qt;if(fi!=="All")ls=ls.filter(q=>q.status===fi);if(se)ls=ls.filter(q=>q.client.toLowerCase().includes(se.toLowerCase()));
 const qs={};qt.forEach(q=>qs[q.status]=(qs[q.status]||0)+1);
-const save=async()=>{if(!fo.client.trim())return;ssv(true);await supabase.from("quotations").insert([fo]);ssv(false);smo(false);sfo({client:"",status:"Pending"});rl()};
+const openAdd=()=>{ser(null);sfo(dF);smo(true)};
+const openEdit=r=>{ser(r);sfo({client:r.client||"",status:r.status||"Pending"});smo(true)};
+const save=async()=>{if(!fo.client.trim())return;ssv(true);if(er){await supabase.from("quotations").update(fo).eq("id",er.id)}else{await supabase.from("quotations").insert([fo])}ssv(false);smo(false);ser(null);sfo(dF);rl()};
 const del=async id=>{if(!confirm("Delete?"))return;await supabase.from("quotations").delete().eq("id",id);rl()};
 return <div style={{display:"flex",flexDirection:"column",gap:16}}>
 <div style={{display:"flex",gap:12,flexWrap:"wrap"}}><KPI l="Total" v={qt.length} p/><KPI l="Awarded" v={qs.Awarded||0} s={qt.length?((qs.Awarded||0)/qt.length*100).toFixed(0)+"%":"0%"} p/><KPI l="Dropped" v={qs.Dropped||0} p={false}/><KPI l="Pending" v={qs.Pending||0} p/></div>
-<Card><CH title={"Quotations ("+ls.length+")"} right={<div style={{display:"flex",gap:4,alignItems:"center"}}><input placeholder="Search..." value={se} onChange={e=>sse(e.target.value)} style={{background:t.bg,border:"1px solid "+t.bd,borderRadius:6,padding:"5px 10px",color:t.tx,fontSize:12,width:120,outline:"none"}}/>{sts.map(s=><Btn key={s} a={fi===s} l={s} onClick={()=>sfi(s)}/>)}<AB onClick={()=>smo(true)} l="+"/></div>}/>
+<Card><CH title={"Quotations ("+ls.length+")"} right={<div style={{display:"flex",gap:4,alignItems:"center"}}><input placeholder="Search..." value={se} onChange={e=>sse(e.target.value)} style={{background:t.bg,border:"1px solid "+t.bd,borderRadius:6,padding:"5px 10px",color:t.tx,fontSize:12,width:120,outline:"none"}}/>{sts.map(s=><Btn key={s} a={fi===s} l={s} onClick={()=>sfi(s)}/>)}<AB onClick={openAdd} l="+"/></div>}/>
 <div style={{maxHeight:460,overflow:"auto"}}>{ls.map((q,i)=><div key={q.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 18px",borderBottom:"1px solid "+t.bd}}>
 <div style={{fontSize:13,fontWeight:500,color:t.tw}}>{q.client}</div>
-<div style={{display:"flex",alignItems:"center",gap:8}}><Pill c={q.status==="Awarded"?t.gn:q.status==="Dropped"?t.td:q.status==="Lost"?t.rd:t.am}>{q.status}</Pill>{q.id&&<DB onClick={()=>del(q.id)}/>}</div>
+<div style={{display:"flex",alignItems:"center",gap:4}}><Pill c={q.status==="Awarded"?t.gn:q.status==="Dropped"?t.td:q.status==="Lost"?t.rd:t.am}>{q.status}</Pill>{q.id&&<><EB onClick={()=>openEdit(q)}/><DB onClick={()=>del(q.id)}/></>}</div>
 </div>)}</div></Card>
-<Modal open={mo} onClose={()=>smo(false)} title="Add quotation"><F l="Client" v={fo.client} onChange={v=>sfo({...fo,client:v})}/><F l="Status" v={fo.status} onChange={v=>sfo({...fo,status:v})} opts={["Awarded","Dropped","Lost","Pending"]}/><SB onClick={save} loading={sv}/></Modal>
+<Modal open={mo} onClose={()=>smo(false)} title={er?"Edit quotation":"Add quotation"}><F l="Client" v={fo.client} onChange={v=>sfo({...fo,client:v})}/><F l="Status" v={fo.status} onChange={v=>sfo({...fo,status:v})} opts={["Awarded","Dropped","Lost","Pending"]}/><SB onClick={save} loading={sv}/></Modal>
 </div>}
 
-function ExpPage({exp,rl}){const t=useContext(Ctx);const[mo,smo]=useState(false);const[fo,sfo]=useState({item:"",amount:0});const[sv,ssv]=useState(false);
-const save=async()=>{if(!fo.item.trim())return;ssv(true);await supabase.from("expenses").insert([{item:fo.item,amount:Number(fo.amount),frequency:"Monthly"}]);ssv(false);smo(false);sfo({item:"",amount:0});rl()};
+function ExpPage({exp,rl}){
+const t=useContext(Ctx);
+const[mo,smo]=useState(false);
+const dF={item:"",amount:0};
+const[fo,sfo]=useState(dF);const[sv,ssv]=useState(false);const[er,ser]=useState(null);
+const openAdd=()=>{ser(null);sfo(dF);smo(true)};
+const openEdit=r=>{ser(r);sfo({item:r.item||"",amount:r.amount||0});smo(true)};
+const save=async()=>{if(!fo.item.trim())return;ssv(true);const d={item:fo.item,amount:Number(fo.amount),frequency:"Monthly"};if(er){await supabase.from("expenses").update(d).eq("id",er.id)}else{await supabase.from("expenses").insert([d])}ssv(false);smo(false);ser(null);sfo(dF);rl()};
 const del=async id=>{if(!confirm("Delete?"))return;await supabase.from("expenses").delete().eq("id",id);rl()};
 return <div style={{display:"flex",flexDirection:"column",gap:16}}>
 <KPI l="Monthly expenses" v={fm(exp.reduce((a,e)=>a+(e.amount||0),0))+" AED"} s={exp.length+" items"} p={false}/>
-<Card><CH title="Expenses" right={<AB onClick={()=>smo(true)} l="+ Add"/>}/>
+<Card><CH title="Expenses" right={<AB onClick={openAdd} l="+ Add"/>}/>
 <div style={{padding:"0 18px"}}>{exp.map((e,i)=><div key={e.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid "+t.bd}}>
 <div style={{fontSize:13,fontWeight:500,color:t.tw}}>{e.item}</div>
-<div style={{display:"flex",alignItems:"center",gap:8}}><div style={{fontSize:14,fontWeight:700,color:t.am}}>{(e.amount||0).toLocaleString()} AED</div>{e.id&&<DB onClick={()=>del(e.id)}/>}</div>
+<div style={{display:"flex",alignItems:"center",gap:4}}><div style={{fontSize:14,fontWeight:700,color:t.am}}>{(e.amount||0).toLocaleString()} AED</div>{e.id&&<><EB onClick={()=>openEdit(e)}/><DB onClick={()=>del(e.id)}/></>}</div>
 </div>)}</div></Card>
-<Modal open={mo} onClose={()=>smo(false)} title="Add expense"><F l="Item" v={fo.item} onChange={v=>sfo({...fo,item:v})}/><F l="Amount (AED)" v={fo.amount} onChange={v=>sfo({...fo,amount:v})} type="number"/><SB onClick={save} loading={sv}/></Modal>
+<Modal open={mo} onClose={()=>smo(false)} title={er?"Edit expense":"Add expense"}><F l="Item" v={fo.item} onChange={v=>sfo({...fo,item:v})}/><F l="Amount (AED)" v={fo.amount} onChange={v=>sfo({...fo,amount:v})} type="number"/><SB onClick={save} loading={sv}/></Modal>
 </div>}
 
-const NAV=[{k:"dash",l:"Dashboard",i:"\u25A3"},{k:"sales",l:"Sales",i:"\u26A1"},{k:"inf",l:"Influencers",i:"\u2605"},{k:"cash",l:"Cash flow",i:"$"},{k:"quot",l:"Quotations",i:"\u2611"},{k:"exp",l:"Expenses",i:"\u2699"}];
+const NAV=[{k:"dash",l:"Dashboard",i:"▣"},{k:"sales",l:"Sales",i:"⚡"},{k:"inf",l:"Influencers",i:"★"},{k:"cash",l:"Cash flow",i:"$"},{k:"quot",l:"Quotations",i:"☑"},{k:"exp",l:"Expenses",i:"⚙"}];
 
 export default function App(){
 const[mode,setMode]=useState("dark");const[active,setActive]=useState("dash");const[loading,setLoading]=useState(true);
@@ -145,7 +176,7 @@ return <Ctx.Provider value={t}><div style={{display:"flex",height:"100vh",backgr
 <div style={{width:165,background:t.s1,borderRight:"1px solid "+t.bd,display:"flex",flexDirection:"column",flexShrink:0}}>
 <div style={{padding:"14px 12px",borderBottom:"1px solid "+t.bd,display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:28,borderRadius:7,background:"linear-gradient(135deg,#3B82F6,#8B5CF6)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:12}}>A</div><div style={{fontWeight:700,fontSize:13,color:t.tw}}>ALBAB Media</div></div>
 <div style={{flex:1,padding:"4px 0"}}>{NAV.map(n=><div key={n.k} onClick={()=>setActive(n.k)} style={{display:"flex",alignItems:"center",gap:7,padding:"9px 14px",cursor:"pointer",color:active===n.k?t.bl:t.tm,background:active===n.k?t.bG:"transparent",borderRight:active===n.k?"2px solid "+t.bl:"2px solid transparent",fontSize:13,fontWeight:active===n.k?600:400}} onMouseEnter={e=>{if(active!==n.k)e.currentTarget.style.background=t.s3}} onMouseLeave={e=>{if(active!==n.k)e.currentTarget.style.background="transparent"}}><span style={{fontSize:15,width:18,textAlign:"center"}}>{n.i}</span>{n.l}</div>)}</div>
-<div style={{padding:"8px 10px",borderTop:"1px solid "+t.bd}}><div onClick={()=>setMode(m=>m==="dark"?"light":"dark")} style={{padding:"8px 10px",background:t.s2,borderRadius:8,cursor:"pointer",color:t.tm,fontSize:12,textAlign:"center"}}>{mode==="dark"?"\u2600 Light":"\u263E Dark"}</div></div>
+<div style={{padding:"8px 10px",borderTop:"1px solid "+t.bd}}><div onClick={()=>setMode(m=>m==="dark"?"light":"dark")} style={{padding:"8px 10px",background:t.s2,borderRadius:8,cursor:"pointer",color:t.tm,fontSize:12,textAlign:"center"}}>{mode==="dark"?"☀ Light":"☾ Dark"}</div></div>
 </div>
 <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
 <div style={{padding:"10px 20px",borderBottom:"1px solid "+t.bd,background:t.s1,flexShrink:0,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
