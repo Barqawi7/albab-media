@@ -857,7 +857,141 @@ function SocialPage(){
   );
 }
 
-const NAV=[{k:"dash",l:"Dashboard",i:"\u25A3"},{k:"sales",l:"Sales",i:"\u26A1"},{k:"inf",l:"Influencers",i:"\u2605"},{k:"cash",l:"Cash flow",i:"$"},{k:"quot",l:"Quotations",i:"\u2611"},{k:"exp",l:"Expenses",i:"\u2699"},{k:"contacts",l:"Contacts",i:"\u260E"},{k:"events",l:"Events",i:"\uD83D\uDCC5"},{k:"social",l:"Social Media",i:"\uD83D\uDCF1"}];
+function GmailPage(){
+  const t=useContext(Ctx);
+  const[connected,setConnected]=useState(false);
+  const[profile,setProfile]=useState(null);
+  const[msgs,setMsgs]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const[selected,setSelected]=useState(null);
+  const[msgBody,setMsgBody]=useState("");
+  const[compose,setCompose]=useState(false);
+  const[mail,setMail]=useState({to:"",subject:"",body:""});
+  const[sending,setSending]=useState(false);
+  const[sent,setSent]=useState(false);
+  const[search,setSearch]=useState("");
+  const[query,setQuery]=useState("in:inbox");
+
+  const authUrl=`https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent("239120064064-p70c9lqugpspg0ttcu6bbqqlstncn810.apps.googleusercontent.com")}&redirect_uri=${encodeURIComponent(window.location.origin+"/api/auth/callback")}&response_type=code&scope=${encodeURIComponent("https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email")}&access_type=offline&prompt=consent`;
+
+  const checkConnection=useCallback(async()=>{
+    try{
+      const r=await fetch("/api/gmail/messages?action=profile");
+      const d=await r.json();
+      if(d.emailAddress){setConnected(true);setProfile(d);loadMsgs(query);}
+    }catch(e){}
+  },[]);
+
+  const loadMsgs=async(q)=>{
+    setLoading(true);setSelected(null);setMsgBody("");
+    try{
+      const r=await fetch("/api/gmail/messages?q="+encodeURIComponent(q));
+      const d=await r.json();
+      setMsgs(d.messages||[]);
+    }catch(e){}
+    setLoading(false);
+  };
+
+  const openMsg=async(msg)=>{
+    setSelected(msg);
+    try{
+      const r=await fetch("/api/gmail/messages?action=message&messageId="+msg.id);
+      const d=await r.json();
+      const parts=d.payload?.parts||[d.payload];
+      let body="";
+      const findText=(p)=>{
+        if(!p)return;
+        if(p.mimeType==="text/plain"&&p.body?.data){body=atob(p.body.data.replace(/-/g,"+").replace(/_/g,"/"));return;}
+        if(p.parts)p.parts.forEach(findText);
+      };
+      parts.forEach(findText);
+      setMsgBody(body||msg.snippet);
+    }catch(e){setMsgBody(msg.snippet);}
+  };
+
+  const sendMail=async()=>{
+    if(!mail.to||!mail.subject||!mail.body)return;
+    setSending(true);
+    const r=await fetch("/api/gmail/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(mail)});
+    const d=await r.json();
+    setSending(false);
+    if(d.id){setSent(true);setCompose(false);setMail({to:"",subject:"",body:""});setTimeout(()=>setSent(false),3000);}
+  };
+
+  useEffect(()=>{checkConnection();},[checkConnection]);
+  useEffect(()=>{const p=new URLSearchParams(window.location.search);if(p.get("connected")==="true"){checkConnection();window.history.replaceState({},"","/");}},[checkConnection]);
+
+  if(!connected)return(
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:60}}>
+      <div style={{fontSize:48}}>✉️</div>
+      <div style={{fontSize:22,fontWeight:700,color:t.tw}}>Connect Gmail</div>
+      <div style={{fontSize:14,color:t.td,textAlign:"center",maxWidth:400}}>Connect your Gmail account to read emails, search your inbox and send emails directly from ALBAB Media.</div>
+      <button onClick={()=>window.location.href=authUrl} style={{padding:"12px 28px",borderRadius:10,border:"none",background:t.bl,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>Connect Gmail Account</button>
+    </div>
+  );
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+        <KPI l="Connected as" v={profile?.emailAddress||"Gmail"} s="Active" p/>
+        <KPI l="Messages" v={msgs.length} s="loaded" p/>
+        {sent&&<div style={{padding:"10px 18px",background:t.gG,border:"1px solid "+t.gn,borderRadius:10,color:t.gn,fontWeight:600}}>✓ Email sent!</div>}
+      </div>
+
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        <input placeholder="Search emails..." value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){setQuery(search||"in:inbox");loadMsgs(search||"in:inbox");}}} style={{flex:1,minWidth:200,padding:"8px 12px",borderRadius:8,border:"1px solid "+t.bd,background:t.bg,color:t.tx,fontSize:13,outline:"none"}}/>
+        <button onClick={()=>{setQuery(search||"in:inbox");loadMsgs(search||"in:inbox");}} style={{padding:"8px 14px",borderRadius:8,border:"none",background:t.bl,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Search</button>
+        {["in:inbox","in:sent","is:unread"].map(q=><Btn key={q} a={query===q} l={q.replace("in:","").replace("is:","")} onClick={()=>{setQuery(q);loadMsgs(q);}}/>)}
+        <AB onClick={()=>setCompose(true)} l="✉ Compose"/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:selected?"1fr 1fr":"1fr",gap:14}}>
+        <Card>
+          <CH title={"Inbox ("+msgs.length+")"}/>
+          <div style={{maxHeight:520,overflow:"auto"}}>
+            {loading?<div style={{padding:40,textAlign:"center",color:t.td}}>Loading...</div>:
+            msgs.length===0?<div style={{padding:40,textAlign:"center",color:t.td}}>No messages found</div>:
+            msgs.map((m,i)=>(
+              <div key={i} onClick={()=>openMsg(m)} style={{padding:"11px 18px",borderBottom:"1px solid "+t.bd,cursor:"pointer",background:selected?.id===m.id?t.bG:"transparent"}} onMouseEnter={e=>e.currentTarget.style.background=t.s3} onMouseLeave={e=>e.currentTarget.style.background=selected?.id===m.id?t.bG:"transparent"}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                  <div style={{fontSize:12,fontWeight:m.unread?700:500,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{m.from?.split("<")[0]||m.from}</div>
+                  <div style={{fontSize:10,color:t.td,flexShrink:0,marginLeft:8}}>{new Date(m.date).toLocaleDateString()}</div>
+                </div>
+                <div style={{fontSize:12,fontWeight:m.unread?700:500,color:m.unread?t.tw:t.tm,marginBottom:2}}>{m.subject}</div>
+                <div style={{fontSize:11,color:t.td,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.snippet}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {selected&&(
+          <Card>
+            <CH title={selected.subject} right={<button onClick={()=>{setSelected(null);setMsgBody("");}} style={{background:"transparent",border:"none",color:t.td,cursor:"pointer",fontSize:18}}>×</button>}/>
+            <div style={{padding:18}}>
+              <div style={{fontSize:12,color:t.td,marginBottom:4}}>From: {selected.from}</div>
+              <div style={{fontSize:12,color:t.td,marginBottom:14}}>Date: {new Date(selected.date).toLocaleString()}</div>
+              <div style={{fontSize:13,color:t.tx,lineHeight:1.7,whiteSpace:"pre-wrap",maxHeight:380,overflow:"auto"}}>{msgBody}</div>
+              <button onClick={()=>{setCompose(true);setMail({to:selected.from.match(/<(.+)>/)?.[1]||selected.from,subject:"Re: "+selected.subject,body:"\n\n---\nOn "+new Date(selected.date).toLocaleString()+", "+selected.from+" wrote:\n"+msgBody.slice(0,300)+"..."});}} style={{marginTop:14,padding:"8px 16px",borderRadius:8,border:"none",background:t.bl,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>↩ Reply</button>
+            </div>
+          </Card>
+        )}
+      </div>
+
+      {/* Compose modal */}
+      <Modal open={compose} onClose={()=>setCompose(false)} title="Compose Email">
+        <F l="To" v={mail.to} onChange={v=>setMail({...mail,to:v})}/>
+        <F l="Subject" v={mail.subject} onChange={v=>setMail({...mail,subject:v})}/>
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:12,color:useContext(Ctx).tm,marginBottom:4}}>Message</div>
+          <textarea value={mail.body} onChange={e=>setMail({...mail,body:e.target.value})} rows={8} style={{width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid "+t.bd,background:t.s2,color:t.tx,fontSize:13,outline:"none",boxSizing:"border-box",resize:"vertical"}}/>
+        </div>
+        <SB onClick={sendMail} loading={sending}/>
+      </Modal>
+    </div>
+  );
+}
+
+const NAV=[{k:"dash",l:"Dashboard",i:"\u25A3"},{k:"sales",l:"Sales",i:"\u26A1"},{k:"inf",l:"Influencers",i:"\u2605"},{k:"cash",l:"Cash flow",i:"$"},{k:"quot",l:"Quotations",i:"\u2611"},{k:"exp",l:"Expenses",i:"\u2699"},{k:"contacts",l:"Contacts",i:"\u260E"},{k:"events",l:"Events",i:"\uD83D\uDCC5"},{k:"social",l:"Social Media",i:"\uD83D\uDCF1"},{k:"gmail",l:"Gmail",i:"\u2709"}];
 
 export default function App(){
   const[mode,setMode]=useState("dark");const[active,setActive]=useState("dash");const[loading,setLoading]=useState(true);
@@ -885,7 +1019,8 @@ export default function App(){
     quot:<QuotPage qt={data.qt} rl={load}/>,
     contacts:<ContactsPage/>,
     events:<EventsPage/>,
-    social:<SocialPage/>
+    social:<SocialPage/>,
+    gmail:<GmailPage/>
   };
   return(
     <Ctx.Provider value={t}>
