@@ -478,13 +478,13 @@ function ContactsPage(){
   const[er,ser]=useState(null);
   const[sv,ssv]=useState(false);
   const PER=250;
-  const dF={name:"",company:"",title:"",email:"",phone:"",industry:"",city:"Dubai"};
+  const dF={company:"",category:"",contact_person:"",position:"",email:"",phone:"",website:"",location:"Dubai",type:""};
   const[fo,sfo]=useState(dF);
 
   const fetch=useCallback(async(q,pg)=>{
     setLoading(true);
     let qb=supabase.from("contacts").select("*",{count:"exact"});
-    if(q){qb=qb.or("name.ilike.%"+q+"%,company.ilike.%"+q+"%,email.ilike.%"+q+"%,industry.ilike.%"+q+"%")}
+    if(q){qb=qb.or("company.ilike.%"+q+"%,email.ilike.%"+q+"%,category.ilike.%"+q+"%,contact_person.ilike.%"+q+"%")}
     qb=qb.order("id").range(pg*PER,(pg+1)*PER-1);
     const{data,count}=await qb;
     setRows(data||[]);
@@ -496,8 +496,8 @@ function ContactsPage(){
 
   const doSearch=()=>{setPage(0);setQuery(se)};
   const openAdd=()=>{ser(null);sfo(dF);smo(true)};
-  const openEdit=r=>{ser(r);sfo({name:r.name||"",company:r.company||"",title:r.title||"",email:r.email||"",phone:r.phone||"",industry:r.industry||"",city:r.city||""});smo(true)};
-  const save=async()=>{if(!fo.name.trim())return;ssv(true);if(er){await supabase.from("contacts").update(fo).eq("id",er.id)}else{await supabase.from("contacts").insert([fo])}ssv(false);smo(false);ser(null);sfo(dF);fetch(query,page)};
+  const openEdit=r=>{ser(r);sfo({company:r.company||"",category:r.category||"",contact_person:r.contact_person||"",position:r.position||"",email:r.email||"",phone:r.phone||"",website:r.website||"",location:r.location||"Dubai",type:r.type||""});smo(true)};
+  const save=async()=>{if(!fo.company.trim())return;ssv(true);if(er){await supabase.from("contacts").update(fo).eq("id",er.id)}else{await supabase.from("contacts").insert([fo])}ssv(false);smo(false);ser(null);sfo(dF);fetch(query,page)};
   const del=async id=>{if(!confirm("Delete?"))return;await supabase.from("contacts").delete().eq("id",id);fetch(query,page)};
 
   const pages=Math.ceil(total/PER);
@@ -525,13 +525,12 @@ function ContactsPage(){
         }/>
         {/* Table header */}
         <div style={{display:"flex",padding:"7px 18px",borderBottom:"1px solid "+t.bd,fontSize:11,color:t.td,fontWeight:600,textTransform:"uppercase",letterSpacing:.5}}>
-          <div style={{flex:2}}>Name</div>
           <div style={{flex:2}}>Company</div>
-          <div style={{flex:1.5}}>Title</div>
+          <div style={{flex:1.5}}>Category</div>
+          <div style={{flex:1.5}}>Contact Person</div>
           <div style={{flex:2}}>Email</div>
           <div style={{flex:1}}>Phone</div>
-          <div style={{flex:1}}>Industry</div>
-          <div style={{flex:1}}>City</div>
+          <div style={{flex:1}}>Location</div>
           <div style={{width:60}}></div>
         </div>
         <div style={{maxHeight:500,overflow:"auto"}}>
@@ -541,13 +540,12 @@ function ContactsPage(){
             <div style={{padding:40,textAlign:"center",color:t.td}}>No contacts found</div>
           ):rows.map((c,i)=>(
             <div key={c.id||i} style={{display:"flex",alignItems:"center",padding:"9px 18px",borderBottom:"1px solid "+t.bd,fontSize:12,gap:4}} onMouseEnter={e=>e.currentTarget.style.background=t.s3} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-              <div style={{flex:2,fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name||"—"}</div>
-              <div style={{flex:2,color:t.tm,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.company||"—"}</div>
-              <div style={{flex:1.5,color:t.td,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.title||"—"}</div>
+              <div style={{flex:2,fontWeight:600,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.company||"—"}</div>
+              <div style={{flex:1.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><Pill c={t.pr}>{c.category||"—"}</Pill></div>
+              <div style={{flex:1.5,color:t.tm,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.contact_person||"—"}</div>
               <div style={{flex:2,color:t.bl,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.email||"—"}</div>
               <div style={{flex:1,color:t.tm,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.phone||"—"}</div>
-              <div style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><Pill c={t.pr}>{c.industry||"—"}</Pill></div>
-              <div style={{flex:1,color:t.td,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.city||"—"}</div>
+              <div style={{flex:1,color:t.td,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.location||"—"}</div>
               <div style={{width:60,display:"flex",gap:2,flexShrink:0}}><EB onClick={()=>openEdit(c)}/><DB onClick={()=>del(c.id)}/></div>
             </div>
           ))}
@@ -562,13 +560,13 @@ function ContactsPage(){
         )}
       </Card>
       <Modal open={mo} onClose={()=>smo(false)} title={er?"Edit contact":"Add contact"}>
-        <F l="Name" v={fo.name} onChange={v=>sfo({...fo,name:v})}/>
         <F l="Company" v={fo.company} onChange={v=>sfo({...fo,company:v})}/>
-        <F l="Title" v={fo.title} onChange={v=>sfo({...fo,title:v})}/>
+        <F l="Category" v={fo.category} onChange={v=>sfo({...fo,category:v})}/>
+        <F l="Contact Person" v={fo.contact_person} onChange={v=>sfo({...fo,contact_person:v})}/>
+        <F l="Position" v={fo.position} onChange={v=>sfo({...fo,position:v})}/>
         <F l="Email" v={fo.email} onChange={v=>sfo({...fo,email:v})}/>
         <F l="Phone" v={fo.phone} onChange={v=>sfo({...fo,phone:v})}/>
-        <F l="Industry" v={fo.industry} onChange={v=>sfo({...fo,industry:v})}/>
-        <F l="City" v={fo.city} onChange={v=>sfo({...fo,city:v})}/>
+        <F l="Location" v={fo.location} onChange={v=>sfo({...fo,location:v})}/>
         <SB onClick={save} loading={sv}/>
       </Modal>
     </div>
