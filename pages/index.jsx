@@ -461,8 +461,8 @@ function InfPage({inf,rl}){
     <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
       <Stat label="Total Influencers" value={inf.length.toLocaleString()} sub="UAE database" accent={t.pr}/>
       <Stat label="Mega (10M+)" value={tc.Mega||0} accent={t.pr}/>
-      <Stat label="Micro" value={tc.Micro||0} accent={t.gn}/>
-      <Stat label="Avg Engagement" value={inf.length?(inf.reduce((a,i)=>a+(i.engagement||0),0)/inf.length).toFixed(1)+"%":"0%"} accent={t.tl}/>
+      <Stat label="Mid (100K-1M)" value={tc.Mid||0} accent={t.tl}/>
+      <Stat label="Micro (<100K)" value={tc.Micro||0} accent={t.gn}/>
     </div>
 
     <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:14}}>
@@ -661,7 +661,7 @@ function ContactsPage(){
   const[rows,setRows]=useState([]);const[total,setTotal]=useState(0);
   const[se,sse]=useState("");const[query,setQuery]=useState("");
   const[page,setPage]=useState(0);const[loading,setLoading]=useState(true);
-  const[tab,setTab]=useState("b2b");
+  const[tab,setTab]=useState("all");
   const[catFilter,setCatFilter]=useState("All");
   const[mo,smo]=useState(false);const[er,ser]=useState(null);const[sv,ssv]=useState(false);
   const PER=200;
@@ -671,8 +671,8 @@ function ContactsPage(){
   const fetch=useCallback(async(q,pg,tb,cf)=>{
     setLoading(true);
     let qb=supabase.from("contacts").select("*",{count:"exact"});
-    if(tb==="b2b")qb=qb.neq("industry","Property Owner");
-    else if(tb==="realestate")qb=qb.eq("industry","Property Owner");
+    if(tb==="realestate")qb=qb.eq("category","Property Owner");
+    else if(tb==="b2b")qb=qb.neq("category","Property Owner");
     if(cf&&cf!=="All")qb=qb.eq("category",cf);
     if(q)qb=qb.or("company.ilike.%"+q+"%,email.ilike.%"+q+"%,category.ilike.%"+q+"%,contact_person.ilike.%"+q+"%");
     qb=qb.order("id").range(pg*PER,(pg+1)*PER-1);
