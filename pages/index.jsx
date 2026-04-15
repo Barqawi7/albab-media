@@ -760,6 +760,76 @@ function ContactsPage(){
   </div>;
 }
 
+// ── PROPERTIES ────────────────────────────────────────────────────────────────
+function PropertiesPage(){
+  const t=useContext(Ctx);
+  const[rows,setRows]=useState([]);const[total,setTotal]=useState(0);
+  const[se,sse]=useState("");const[query,setQuery]=useState("");
+  const[page,setPage]=useState(0);const[loading,setLoading]=useState(true);
+  const[areaFilter,setAreaFilter]=useState("All");
+  const PER=100;
+
+  const fetch=useCallback(async(q,pg,af)=>{
+    setLoading(true);
+    let qb=supabase.from("property_owners").select("*",{count:"exact"});
+    if(af&&af!=="All")qb=qb.eq("area",af);
+    if(q)qb=qb.or("owner.ilike.%"+q+"%,community.ilike.%"+q+"%,unit.ilike.%"+q+"%,mobile.ilike.%"+q+"%");
+    qb=qb.order("id").range(pg*PER,(pg+1)*PER-1);
+    const{data,count}=await qb;
+    setRows(data||[]);if(count!==null)setTotal(count);
+    setLoading(false);
+  },[]);
+
+  useEffect(()=>{fetch(query,page,areaFilter)},[query,page,areaFilter,fetch]);
+
+  const doSearch=()=>{setPage(0);setQuery(se)};
+  const pages=Math.ceil(total/PER);
+  const areas=["All","JVC","Meydan","Arjan","Dubai Creek","Al Furjan","Business Bay"];
+
+  return <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+      <Stat label="Total properties" value={total.toLocaleString()} sub="in database" accent={t.bl}/>
+      <Stat label="Showing" value={rows.length} sub={"Page "+(page+1)+" of "+(pages||1)} accent={t.tl}/>
+    </div>
+
+    {/* Area filters */}
+    <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+      {areas.map(a=><Btn key={a} active={areaFilter===a} label={a} onClick={()=>{setAreaFilter(a);setPage(0);}}/>)}
+    </div>
+
+    <Panel title={"Properties ("+total.toLocaleString()+")"} right={
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        <SearchBar value={se} onChange={sse} onKey={e=>e.key==="Enter"&&doSearch()} placeholder="Search owner, community, unit, mobile..." width={240}/>
+        <BlueBtn onClick={doSearch} label="Search"/>
+        {query&&<button onClick={()=>{sse("");setQuery("");setPage(0);}} style={{padding:"6px 12px",borderRadius:8,border:"none",background:"transparent",color:t.tm,fontSize:12,cursor:"pointer"}}>Clear</button>}
+      </div>
+    }>
+      <div style={{display:"flex",padding:"7px 18px",borderBottom:"1px solid "+t.bd,fontSize:10,color:t.td,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>
+        <div style={{flex:1.2}}>Area</div><div style={{flex:1.5}}>Community</div>
+        <div style={{flex:1.5}}>Owner</div><div style={{flex:1.3}}>Mobile</div>
+        <div style={{flex:.9}}>Size</div><div style={{flex:.9}}>Unit</div>
+      </div>
+      <div style={{maxHeight:520,overflow:"auto"}}>
+        {loading?<div style={{padding:40,textAlign:"center",color:t.td}}>Loading...</div>:
+        rows.length===0?<div style={{padding:40,textAlign:"center",color:t.td}}>No properties found. Try a different search or filter.</div>:
+        rows.map((p,i)=><div key={p.id||i} style={{display:"flex",alignItems:"center",padding:"9px 18px",borderBottom:"1px solid "+t.bd,fontSize:12,gap:4}} onMouseEnter={e=>e.currentTarget.style.background=t.s3} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+          <div style={{flex:1.2}}>{p.area?<Tag c={t.pr}>{p.area}</Tag>:<span style={{color:t.td}}>—</span>}</div>
+          <div style={{flex:1.5,color:t.tm,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.community||"—"}</div>
+          <div style={{flex:1.5,fontWeight:700,color:t.tw,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.owner||"—"}</div>
+          <div style={{flex:1.3,color:t.bl,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.mobile||"—"}</div>
+          <div style={{flex:.9,color:t.td,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.size||"—"}</div>
+          <div style={{flex:.9,color:t.td,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.unit||"—"}</div>
+        </div>)}
+      </div>
+      {pages>1&&<div style={{padding:"10px 18px",borderTop:"1px solid "+t.bd,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} style={{padding:"5px 14px",borderRadius:8,border:"1px solid "+t.bd,background:"transparent",color:page===0?t.td:t.tw,cursor:page===0?"not-allowed":"pointer",fontSize:12}}>← Prev</button>
+        <span style={{fontSize:12,color:t.td}}>Page {page+1} of {pages} · {total.toLocaleString()} properties</span>
+        <button onClick={()=>setPage(p=>Math.min(pages-1,p+1))} disabled={page>=pages-1} style={{padding:"5px 14px",borderRadius:8,border:"1px solid "+t.bd,background:"transparent",color:page>=pages-1?t.td:t.tw,cursor:page>=pages-1?"not-allowed":"pointer",fontSize:12}}>Next →</button>
+      </div>}
+    </Panel>
+  </div>;
+}
+
 // ── EVENTS ────────────────────────────────────────────────────────────────────
 const EV_TYPES=["Campaign","Shoot","Meeting","Deadline","Event","Follow-up","Presentation","Other"];
 const EV_STATUS=["Upcoming","In Progress","Done","Cancelled"];
@@ -1135,6 +1205,7 @@ const NAV=[
   {k:"quot",l:"Quotations",i:"☑"},
   {k:"exp",l:"Expenses",i:"⚙"},
   {k:"contacts",l:"Contacts",i:"☎"},
+  {k:"properties",l:"Properties",i:"🏠"},
   {k:"events",l:"Events",i:"📅"},
   {k:"social",l:"Social",i:"📱"},
   {k:"gmail",l:"Gmail",i:"✉"},
@@ -1169,6 +1240,7 @@ export default function App(){
     quot:<QuotPage qt={data.qt} rl={load}/>,
     exp:<ExpPage exp={data.exp} rl={load}/>,
     contacts:<ContactsPage/>,
+    properties:<PropertiesPage/>,
     events:<EventsPage/>,
     social:<SocialPage/>,
     gmail:<GmailPage/>,
