@@ -660,40 +660,37 @@ function ContactsPage(){
   const t=useContext(Ctx);
   const[rows,setRows]=useState([]);const[total,setTotal]=useState(0);
   const[se,sse]=useState("");const[query,setQuery]=useState("");
-  const[page,setPage]=useState(0);const[loading,setLoading]=useState(true);
+  const[loading,setLoading]=useState(true);
   const[tab,setTab]=useState("all");
   const[catFilter,setCatFilter]=useState("All");
   const[mo,smo]=useState(false);const[er,ser]=useState(null);const[sv,ssv]=useState(false);
-  const PER=200;
   const dF={company:"",category:"",contact_person:"",position:"",email:"",phone:"",location:"Dubai",type:""};
   const[fo,sfo]=useState(dF);
 
-  const fetch=useCallback(async(q,pg,tb,cf)=>{
+  const fetch=useCallback(async(q,tb,cf)=>{
     setLoading(true);
     let qb=supabase.from("contacts").select("*",{count:"exact"});
     if(tb==="realestate")qb=qb.eq("category","Property Owner");
     else if(tb==="b2b")qb=qb.neq("category","Property Owner");
     if(cf&&cf!=="All")qb=qb.eq("category",cf);
     if(q)qb=qb.or("company.ilike.%"+q+"%,email.ilike.%"+q+"%,category.ilike.%"+q+"%,contact_person.ilike.%"+q+"%");
-    qb=qb.order("id").range(pg*PER,(pg+1)*PER-1);
+    qb=qb.order("id").range(0,99999);
     const{data,count}=await qb;
     setRows(data||[]);if(count!==null)setTotal(count);
     setLoading(false);
   },[]);
 
-  useEffect(()=>{fetch(query,page,tab,catFilter)},[query,page,tab,catFilter,fetch]);
+  useEffect(()=>{fetch(query,tab,catFilter)},[query,tab,catFilter,fetch]);
 
-  const doSearch=()=>{setPage(0);setQuery(se)};
-  const save=async()=>{if(!fo.company.trim())return;ssv(true);if(er){await supabase.from("contacts").update(fo).eq("id",er.id)}else{await supabase.from("contacts").insert([fo])}ssv(false);smo(false);ser(null);sfo(dF);fetch(query,page,tab,catFilter)};
-  const del=async id=>{if(!confirm("Delete?"))return;await supabase.from("contacts").delete().eq("id",id);fetch(query,page,tab,catFilter)};
+  const doSearch=()=>{setQuery(se)};
+  const save=async()=>{if(!fo.company.trim())return;ssv(true);if(er){await supabase.from("contacts").update(fo).eq("id",er.id)}else{await supabase.from("contacts").insert([fo])}ssv(false);smo(false);ser(null);sfo(dF);fetch(query,tab,catFilter)};
+  const del=async id=>{if(!confirm("Delete?"))return;await supabase.from("contacts").delete().eq("id",id);fetch(query,tab,catFilter)};
   const openEdit=r=>{ser(r);sfo({company:r.company||"",category:r.category||"",contact_person:r.contact_person||"",position:r.position||"",email:r.email||"",phone:r.phone||"",location:r.location||"Dubai",type:r.type||""});smo(true)};
 
   const openCompose=(c)=>{
     if(!c.email)return alert("No email address for this contact");
     window.open("mailto:"+c.email+"?subject=ALBAB Media — Hello "+c.company);
   };
-
-  const pages=Math.ceil(total/PER);
 
   const cats=["All","Hotel","Restaurant","Clinic / Healthcare","Food & Beverage","Government","Fashion & Products","Education","Sports & Activities","Property Owner","Events / Exhibition","Industry / Factory","B2B"];
 
@@ -706,24 +703,24 @@ function ContactsPage(){
   return <div style={{display:"flex",flexDirection:"column",gap:14}}>
     <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
       <Stat label="Total contacts" value={total.toLocaleString()} sub="in database" accent={t.bl}/>
-      <Stat label="Showing" value={rows.length} sub={"Page "+(page+1)+" of "+pages} accent={t.tl}/>
+      <Stat label="Showing" value={rows.length} sub="all loaded" accent={t.tl}/>
     </div>
 
     {/* Smart tabs */}
     <div style={{display:"flex",gap:3,background:t.s2,borderRadius:12,padding:4,width:"fit-content"}}>
-      {tabConfig.map(tb=><button key={tb.k} onClick={()=>{setTab(tb.k);setPage(0);setCatFilter("All");}} style={{padding:"8px 16px",borderRadius:9,border:"none",background:tab===tb.k?t.bl:"transparent",color:tab===tb.k?"#fff":t.tm,fontSize:12,fontWeight:700,cursor:"pointer"}}>{tb.l}</button>)}
+      {tabConfig.map(tb=><button key={tb.k} onClick={()=>{setTab(tb.k);setCatFilter("All");}} style={{padding:"8px 16px",borderRadius:9,border:"none",background:tab===tb.k?t.bl:"transparent",color:tab===tb.k?"#fff":t.tm,fontSize:12,fontWeight:700,cursor:"pointer"}}>{tb.l}</button>)}
     </div>
 
     {/* Category filters */}
     <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-      {cats.map(c=><Btn key={c} active={catFilter===c} label={c} onClick={()=>{setCatFilter(c);setPage(0);}}/>)}
+      {cats.map(c=><Btn key={c} active={catFilter===c} label={c} onClick={()=>setCatFilter(c)}/>)}
     </div>
 
     <Panel title={"Contacts ("+total.toLocaleString()+")"} right={
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
         <SearchBar value={se} onChange={sse} onKey={e=>e.key==="Enter"&&doSearch()} placeholder="Search company, email, category..." width={240}/>
         <BlueBtn onClick={doSearch} label="Search"/>
-        {query&&<button onClick={()=>{sse("");setQuery("");setPage(0);}} style={{padding:"6px 12px",borderRadius:8,border:"none",background:"transparent",color:t.tm,fontSize:12,cursor:"pointer"}}>Clear</button>}
+        {query&&<button onClick={()=>{sse("");setQuery("");}} style={{padding:"6px 12px",borderRadius:8,border:"none",background:"transparent",color:t.tm,fontSize:12,cursor:"pointer"}}>Clear</button>}
         <GreenBtn onClick={()=>{ser(null);sfo(dF);smo(true)}} label="+ Add"/>
       </div>
     }>
@@ -748,11 +745,6 @@ function ContactsPage(){
           </div>
         </div>)}
       </div>
-      {pages>1&&<div style={{padding:"10px 18px",borderTop:"1px solid "+t.bd,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} style={{padding:"5px 14px",borderRadius:8,border:"1px solid "+t.bd,background:"transparent",color:page===0?t.td:t.tw,cursor:page===0?"not-allowed":"pointer",fontSize:12}}>← Prev</button>
-        <span style={{fontSize:12,color:t.td}}>Page {page+1} of {pages} · {total.toLocaleString()} contacts</span>
-        <button onClick={()=>setPage(p=>Math.min(pages-1,p+1))} disabled={page>=pages-1} style={{padding:"5px 14px",borderRadius:8,border:"1px solid "+t.bd,background:"transparent",color:page>=pages-1?t.td:t.tw,cursor:page>=pages-1?"not-allowed":"pointer",fontSize:12}}>Next →</button>
-      </div>}
     </Panel>
 
     <Modal open={mo} onClose={()=>smo(false)} title={er?"Edit Contact":"Add Contact"}>
