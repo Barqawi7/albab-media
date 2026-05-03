@@ -1209,6 +1209,7 @@ const NAV=[
   {k:"events",l:"Events",i:"📅"},
   {k:"social",l:"Social",i:"📱"},
   {k:"gmail",l:"Gmail",i:"✉"},
+  {k:"objectives",l:"Objectives",i:"◎",url:"/objectives"},
   {k:"ai",l:"AI Co-Pilot",i:"🤖"},
 ];
 
@@ -1256,7 +1257,7 @@ export default function App(){
           <div><div style={{fontWeight:900,fontSize:13,color:t.tw}}>ALBAB Media</div><div style={{fontSize:9,color:t.td}}>Business OS</div></div>
         </div>
         <div style={{flex:1,padding:"5px 0",overflow:"auto"}}>
-          {NAV.map(n=><div key={n.k} onClick={()=>setActive(n.k)} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 13px",cursor:"pointer",color:active===n.k?t.bl:t.tm,background:active===n.k?t.bG:"transparent",borderRight:active===n.k?"3px solid "+t.bl:"3px solid transparent",fontSize:12,fontWeight:active===n.k?700:400}} onMouseEnter={e=>{if(active!==n.k)e.currentTarget.style.background=t.s3}} onMouseLeave={e=>{if(active!==n.k)e.currentTarget.style.background="transparent"}}>
+          {NAV.map(n=><div key={n.k} onClick={()=>{if(n.url){window.location.href=n.url}else{setActive(n.k)}}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 13px",cursor:"pointer",color:active===n.k?t.bl:t.tm,background:active===n.k?t.bG:"transparent",borderRight:active===n.k?"3px solid "+t.bl:"3px solid transparent",fontSize:12,fontWeight:active===n.k?700:400}} onMouseEnter={e=>{if(active!==n.k)e.currentTarget.style.background=t.s3}} onMouseLeave={e=>{if(active!==n.k)e.currentTarget.style.background="transparent"}}>
             <span style={{fontSize:14,width:17,textAlign:"center",flexShrink:0}}>{n.i}</span>
             <span>{n.l}</span>
             {n.k==="ai"&&<span style={{marginLeft:"auto",fontSize:9,background:t.pr,color:"#fff",padding:"1px 5px",borderRadius:5,fontWeight:700}}>AI</span>}
