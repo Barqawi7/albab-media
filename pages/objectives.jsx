@@ -226,7 +226,22 @@ const BUCKET_LABEL = { thisWeek: "THIS WEEK", nextWeek: "NEXT WEEK", nextMonth: 
 const BUCKET_SHORT = { thisWeek: "WEEK", nextWeek: "NEXT WK", nextMonth: "NEXT MO", nextQuarter: "NEXT Q" };
 const BUCKET_COLOR = { thisWeek: "#4ade80", nextWeek: "#60a5fa", nextMonth: "#f59e0b", nextQuarter: "#a78bfa" };
 const DAYS = ["FRI", "SAT", "SUN", "MON", "TUE", "WED", "THU"];
-const TABS = ["ALL", ...BUCKETS, ...DAYS];
+const TABS = ["ALL", ...BUCKETS, ...DAYS, "DONE"];
+
+function fmtDoneAt(ts) {
+  if (!ts) return "";
+  try {
+    return new Date(ts).toLocaleString("en-AE", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch (e) {
+    return new Date(ts).toISOString();
+  }
+}
 
 function pad3(n) {
   return String(n).padStart(3, "0");
@@ -264,6 +279,17 @@ export default function Objectives() {
   const [dayModalFor, setDayModalFor] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const undoTimerRef = useRef(null);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+
+  const showToast = (msg) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 3500);
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -294,6 +320,7 @@ export default function Objectives() {
           day: null,
           created: now + i,
           position: SEED_TASKS.length - i,
+          done_at: null,
         }));
         const CHUNK = 100;
         for (let i = 0; i < seed.length; i += CHUNK) {
@@ -357,38 +384,88 @@ export default function Objectives() {
     updateRemote(id, { text: trimmed });
   };
 
-  const deleteWithUndo = (id) => {
+  const setDoneAt = (id, doneAt) => {
+    updateLocal(id, { done_at: doneAt });
+    updateRemote(id, { done_at: doneAt });
+  };
+
+  const markDone = (id) => {
     const t = tasks.find(x => x.id === id);
     if (!t) return;
-    if (pendingDelete && undoTimerRef.current) {
-      clearTimeout(undoTimerRef.current);
-      supabase.from("objectives_v2").delete().eq("id", pendingDelete.task.id).then(({ error }) => {
-        if (error) console.error("[objectives] flush prior delete", error);
-      });
-    }
-    setTasks(ts => ts.filter(x => x.id !== id));
+    const now = Date.now();
+    setDoneAt(id, now);
     setSelectedIds(prev => {
       if (!prev.has(id)) return prev;
       const next = new Set(prev);
       next.delete(id);
       return next;
     });
-    const timeoutId = setTimeout(async () => {
-      const { error } = await supabase.from("objectives_v2").delete().eq("id", id);
-      if (error) console.error("[objectives] delete", error);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setPendingDelete({ task: { ...t, done_at: now } });
+    undoTimerRef.current = setTimeout(() => {
       setPendingDelete(null);
       undoTimerRef.current = null;
     }, 4000);
-    undoTimerRef.current = timeoutId;
-    setPendingDelete({ task: t, timeoutId });
   };
 
-  const undoDelete = () => {
+  const undoDone = () => {
     if (!pendingDelete) return;
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     undoTimerRef.current = null;
-    setTasks(ts => [...ts, pendingDelete.task].sort((a, b) => b.position - a.position || b.created - a.created));
+    setDoneAt(pendingDelete.task.id, null);
     setPendingDelete(null);
+  };
+
+  const restoreDone = (id) => {
+    setDoneAt(id, null);
+  };
+
+  const hardDelete = async (id) => {
+    if (!window.confirm("Permanently delete? This cannot be undone.")) return;
+    setTasks(ts => ts.filter(t => t.id !== id));
+    const { error } = await supabase.from("objectives_v2").delete().eq("id", id);
+    if (error) console.error("[objectives] hard delete", error);
+  };
+
+  const clearAllDone = async () => {
+    const doneIds = tasks.filter(t => t.done_at).map(t => t.id);
+    if (!doneIds.length) {
+      showToast("Nothing to clear — DONE list is empty.");
+      return;
+    }
+    if (!window.confirm(`Permanently delete ${doneIds.length} completed task${doneIds.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    setTasks(ts => ts.filter(t => !t.done_at));
+    const { error } = await supabase.from("objectives_v2").delete().in("id", doneIds);
+    if (error) console.error("[objectives] clear all done", error);
+  };
+
+  const restoreLost = async () => {
+    if (!window.confirm("This will re-add the original 218 seed tasks that aren't already present. Continue?")) return;
+    const existing = new Set(tasks.map(t => t.text));
+    const missing = SEED_TASKS.filter(text => !existing.has(text));
+    if (missing.length === 0) {
+      showToast("All seed tasks already present — nothing to add.");
+      return;
+    }
+    const minPos = tasks.reduce((m, t) => Math.min(m, t.position ?? 0), 0);
+    const now = Date.now();
+    const rows = missing.map((text, i) => ({
+      id: crypto.randomUUID(),
+      text,
+      bucket: null,
+      day: null,
+      created: now + i,
+      position: minPos - 1 - i,
+      done_at: null,
+    }));
+    setTasks(ts => [...ts, ...rows].sort((a, b) => (b.position ?? 0) - (a.position ?? 0) || (b.created ?? 0) - (a.created ?? 0)));
+    const CHUNK = 100;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const { error } = await supabase.from("objectives_v2").insert(chunk);
+      if (error) console.error("[objectives] restore lost", error);
+    }
+    showToast(`Added ${missing.length} missing task${missing.length === 1 ? "" : "s"}`);
   };
 
   const addTask = async () => {
@@ -447,20 +524,26 @@ export default function Objectives() {
     if (error) console.error("[objectives] bulk day", error);
   };
 
-  const bulkDelete = async () => {
+  const bulkMarkDone = async () => {
     const ids = Array.from(selectedIds);
     if (!ids.length) return;
-    setTasks(ts => ts.filter(t => !selectedIds.has(t.id)));
+    const now = Date.now();
+    setTasks(ts => ts.map(t => (selectedIds.has(t.id) ? { ...t, done_at: now } : t)));
     setSelectedIds(new Set());
-    const { error } = await supabase.from("objectives_v2").delete().in("id", ids);
-    if (error) console.error("[objectives] bulk delete", error);
+    const { error } = await supabase.from("objectives_v2").update({ done_at: now }).in("id", ids);
+    if (error) console.error("[objectives] bulk mark done", error);
   };
 
   const counts = useMemo(() => {
-    const c = { ALL: tasks.length };
+    const c = { ALL: 0, DONE: 0 };
     for (const b of BUCKETS) c[b] = 0;
     for (const d of DAYS) c[d] = 0;
     for (const t of tasks) {
+      if (t.done_at) {
+        c.DONE += 1;
+        continue;
+      }
+      c.ALL += 1;
       if (t.bucket && c[t.bucket] !== undefined) c[t.bucket] += 1;
       if (t.bucket === "thisWeek" && t.day && c[t.day] !== undefined) c[t.day] += 1;
     }
@@ -469,12 +552,18 @@ export default function Objectives() {
 
   const visible = useMemo(() => {
     let list = tasks;
-    if (tab === "ALL") {
-      if (hideBucketed) list = list.filter(t => !t.bucket);
-    } else if (BUCKETS.includes(tab)) {
-      list = list.filter(t => t.bucket === tab);
-    } else if (DAYS.includes(tab)) {
-      list = list.filter(t => t.bucket === "thisWeek" && t.day === tab);
+    if (tab === "DONE") {
+      list = list.filter(t => t.done_at);
+      list = list.slice().sort((a, b) => (b.done_at ?? 0) - (a.done_at ?? 0));
+    } else {
+      list = list.filter(t => !t.done_at);
+      if (tab === "ALL") {
+        if (hideBucketed) list = list.filter(t => !t.bucket);
+      } else if (BUCKETS.includes(tab)) {
+        list = list.filter(t => t.bucket === tab);
+      } else if (DAYS.includes(tab)) {
+        list = list.filter(t => t.bucket === "thisWeek" && t.day === tab);
+      }
     }
     const q = filter.trim().toLowerCase();
     if (q) list = list.filter(t => t.text.toLowerCase().includes(q));
@@ -487,10 +576,11 @@ export default function Objectives() {
   }, []);
 
   const renderCard = (t, idx) => {
+    const isDone = !!t.done_at;
     const isSelected = selectedIds.has(t.id);
-    const accent = t.bucket ? BUCKET_COLOR[t.bucket] : "#1f1f1f";
+    const accent = isDone ? "#1f1f1f" : t.bucket ? BUCKET_COLOR[t.bucket] : "#1f1f1f";
     const onCardClick = () => {
-      if (selectMode) toggleSelected(t.id);
+      if (selectMode && !isDone) toggleSelected(t.id);
     };
     return (
       <div
@@ -503,11 +593,12 @@ export default function Objectives() {
           borderLeft: "3px solid " + accent,
           borderRadius: 8,
           padding: "12px 14px",
-          cursor: selectMode ? "pointer" : "default",
+          cursor: selectMode && !isDone ? "pointer" : "default",
           display: "flex",
           flexDirection: "column",
           gap: 10,
-          transition: "background .12s, border-color .12s",
+          opacity: isDone ? 0.6 : 1,
+          transition: "background .12s, border-color .12s, opacity .12s",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
@@ -515,41 +606,80 @@ export default function Objectives() {
             <span style={{ fontSize: 10, color: "#555", fontWeight: 600, letterSpacing: 1, flexShrink: 0 }}>
               #{pad3(idx + 1)}
             </span>
-            <span style={{ fontSize: 14, color: "#e5e5e5", lineHeight: 1.4, wordBreak: "break-word" }}>{t.text}</span>
+            <span
+              style={{
+                fontSize: 14,
+                color: "#e5e5e5",
+                lineHeight: 1.4,
+                wordBreak: "break-word",
+                textDecoration: isDone ? "line-through" : "none",
+              }}
+            >
+              {t.text}
+            </span>
           </div>
-          <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {t.bucket && tagChip(BUCKET_LABEL[t.bucket], BUCKET_COLOR[t.bucket])}
-            {t.bucket === "thisWeek" && t.day && tagChip(t.day, "#e5e5e5")}
-          </div>
+          {!isDone && (
+            <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {t.bucket && tagChip(BUCKET_LABEL[t.bucket], BUCKET_COLOR[t.bucket])}
+              {t.bucket === "thisWeek" && t.day && tagChip(t.day, "#e5e5e5")}
+            </div>
+          )}
         </div>
+        {isDone && (
+          <div style={{ fontSize: 10, color: "#666", letterSpacing: 1, fontWeight: 600 }}>
+            COMPLETED · {fmtDoneAt(t.done_at).toUpperCase()}
+          </div>
+        )}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }} onClick={e => e.stopPropagation()}>
-          <button className="obj-btn obj-btn-primary" onClick={() => deleteWithUndo(t.id)}>
-            DONE
-          </button>
-          {BUCKETS.map(b => {
-            const active = t.bucket === b;
-            const c = BUCKET_COLOR[b];
-            return (
-              <button
-                key={b}
-                onClick={() => setBucket(t.id, b)}
-                className="obj-btn"
-                style={
-                  active
-                    ? { background: c + "1a", borderColor: c + "66", color: c }
-                    : undefined
-                }
-              >
-                {BUCKET_SHORT[b]}
+          {!isDone && (
+            <>
+              <button className="obj-btn obj-btn-primary" onClick={() => markDone(t.id)}>
+                DONE
               </button>
-            );
-          })}
-          <button className="obj-btn" onClick={() => setDayModalFor(t.id)}>
-            DAY
-          </button>
-          <button className="obj-btn" onClick={() => editText(t.id)}>
-            EDIT
-          </button>
+              {BUCKETS.map(b => {
+                const active = t.bucket === b;
+                const c = BUCKET_COLOR[b];
+                return (
+                  <button
+                    key={b}
+                    onClick={() => setBucket(t.id, b)}
+                    className="obj-btn"
+                    style={
+                      active
+                        ? { background: c + "1a", borderColor: c + "66", color: c }
+                        : undefined
+                    }
+                  >
+                    {BUCKET_SHORT[b]}
+                  </button>
+                );
+              })}
+              <button className="obj-btn" onClick={() => setDayModalFor(t.id)}>
+                DAY
+              </button>
+              <button className="obj-btn" onClick={() => editText(t.id)}>
+                EDIT
+              </button>
+            </>
+          )}
+          {isDone && (
+            <>
+              <button
+                className="obj-btn"
+                style={{ borderColor: "#4ade80", color: "#4ade80" }}
+                onClick={() => restoreDone(t.id)}
+              >
+                RESTORE
+              </button>
+              <button
+                className="obj-btn"
+                style={{ borderColor: "#7f1d1d", color: "#ef4444" }}
+                onClick={() => hardDelete(t.id)}
+              >
+                DELETE FOREVER
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -754,7 +884,22 @@ export default function Objectives() {
           <button className="obj-btn" onClick={resetAll}>
             RESET
           </button>
+          <button className="obj-btn" onClick={restoreLost} title="Re-add original seed tasks that were deleted">
+            RESTORE LOST
+          </button>
         </div>
+
+        {tab === "DONE" && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+            <button
+              className="obj-btn"
+              onClick={clearAllDone}
+              style={{ borderColor: "#7f1d1d", color: "#ef4444" }}
+            >
+              CLEAR ALL DONE
+            </button>
+          </div>
+        )}
 
         {selectMode && selectedIds.size > 0 && (
           <div
@@ -812,7 +957,7 @@ export default function Objectives() {
               ))}
               <option value="none">None</option>
             </select>
-            <button className="obj-btn obj-btn-primary" onClick={bulkDelete}>
+            <button className="obj-btn obj-btn-primary" onClick={bulkMarkDone}>
               DONE
             </button>
             <button className="obj-btn" onClick={clearSelection}>
@@ -903,9 +1048,30 @@ export default function Objectives() {
           <span style={{ fontSize: 12, color: "#bbb" }}>
             Done: <span style={{ color: "#fff", fontWeight: 600 }}>{pendingDelete.task.text}</span>
           </span>
-          <button className="obj-btn" onClick={undoDelete} style={{ borderColor: "#4ade80", color: "#4ade80" }}>
+          <button className="obj-btn" onClick={undoDone} style={{ borderColor: "#4ade80", color: "#4ade80" }}>
             UNDO
           </button>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            background: "#111",
+            border: "1px solid #2a2a2a",
+            borderRadius: 10,
+            padding: "10px 16px",
+            zIndex: 60,
+            color: "#e5e5e5",
+            fontSize: 12,
+            boxShadow: "0 6px 30px rgba(0,0,0,.6)",
+            maxWidth: 360,
+          }}
+        >
+          {toast}
         </div>
       )}
 
