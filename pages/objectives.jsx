@@ -281,15 +281,18 @@ export default function Objectives() {
   const undoTimerRef = useRef(null);
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
+  const [lastAction, setLastAction] = useState(null);
 
-  const showToast = (msg) => {
+  const showToast = (msg, duration = 3500) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(msg);
     toastTimerRef.current = setTimeout(() => {
       setToast(null);
       toastTimerRef.current = null;
-    }, 3500);
+    }, duration);
   };
+
+  const recordAction = (action) => setLastAction(action);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -362,13 +365,17 @@ export default function Objectives() {
     const newBucket = t.bucket === bucket ? null : bucket;
     const patch = { bucket: newBucket };
     if (newBucket !== "thisWeek") patch.day = null;
+    recordAction({ kind: "setBucket", id, priorBucket: t.bucket ?? null, priorDay: t.day ?? null });
     updateLocal(id, patch);
     updateRemote(id, patch);
   };
 
   const setDay = (id, day) => {
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
     const patch = { day };
     if (day) patch.bucket = "thisWeek";
+    recordAction({ kind: "setDay", id, priorBucket: t.bucket ?? null, priorDay: t.day ?? null });
     updateLocal(id, patch);
     updateRemote(id, patch);
   };
@@ -380,6 +387,7 @@ export default function Objectives() {
     if (next === null) return;
     const trimmed = next.trim();
     if (!trimmed || trimmed === t.text) return;
+    recordAction({ kind: "editText", id, priorText: t.text });
     updateLocal(id, { text: trimmed });
     updateRemote(id, { text: trimmed });
   };
@@ -393,6 +401,7 @@ export default function Objectives() {
     const t = tasks.find(x => x.id === id);
     if (!t) return;
     const now = Date.now();
+    recordAction({ kind: "markDone", id, priorDoneAt: t.done_at ?? null });
     setDoneAt(id, now);
     setSelectedIds(prev => {
       if (!prev.has(id)) return prev;
@@ -414,15 +423,22 @@ export default function Objectives() {
     undoTimerRef.current = null;
     setDoneAt(pendingDelete.task.id, null);
     setPendingDelete(null);
+    setLastAction(null);
   };
 
   const restoreDone = (id) => {
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
+    recordAction({ kind: "restoreDone", id, priorDoneAt: t.done_at ?? null });
     setDoneAt(id, null);
   };
 
   const hardDelete = async (id) => {
-    if (!window.confirm("Permanently delete? This cannot be undone.")) return;
-    setTasks(ts => ts.filter(t => t.id !== id));
+    if (!window.confirm("Permanently delete? You can undo only your very next action.")) return;
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
+    recordAction({ kind: "hardDelete", task: { ...t } });
+    setTasks(ts => ts.filter(x => x.id !== id));
     const { error } = await supabase.from("objectives_v2").delete().eq("id", id);
     if (error) console.error("[objectives] hard delete", error);
   };
@@ -458,6 +474,7 @@ export default function Objectives() {
       position: minPos - 1 - i,
       done_at: null,
     }));
+    recordAction({ kind: "restoreLost", ids: rows.map(r => r.id) });
     setTasks(ts => [...ts, ...rows].sort((a, b) => (b.position ?? 0) - (a.position ?? 0) || (b.created ?? 0) - (a.created ?? 0)));
     const CHUNK = 100;
     for (let i = 0; i < rows.length; i += CHUNK) {
@@ -479,7 +496,9 @@ export default function Objectives() {
       day: null,
       created: Date.now(),
       position: maxPos + 1,
+      done_at: null,
     };
+    recordAction({ kind: "addTask", id: row.id });
     setTasks(ts => [row, ...ts]);
     setAddText("");
     const { error } = await supabase.from("objectives_v2").insert(row);
@@ -488,6 +507,10 @@ export default function Objectives() {
 
   const resetAll = async () => {
     if (!window.confirm("Clear all bucket and day assignments on every task?")) return;
+    const items = tasks
+      .filter(t => t.bucket || t.day)
+      .map(t => ({ id: t.id, priorBucket: t.bucket ?? null, priorDay: t.day ?? null }));
+    recordAction({ kind: "resetAll", items });
     setTasks(ts => ts.map(t => ({ ...t, bucket: null, day: null })));
     const { error } = await supabase.from("objectives_v2").update({ bucket: null, day: null }).not("id", "is", null);
     if (error) console.error("[objectives] reset", error);
@@ -509,6 +532,10 @@ export default function Objectives() {
     if (!ids.length) return;
     const patch = { bucket };
     if (bucket !== "thisWeek") patch.day = null;
+    const items = tasks
+      .filter(t => selectedIds.has(t.id))
+      .map(t => ({ id: t.id, priorBucket: t.bucket ?? null, priorDay: t.day ?? null }));
+    recordAction({ kind: "bulkSetBucket", items });
     setTasks(ts => ts.map(t => (selectedIds.has(t.id) ? { ...t, ...patch } : t)));
     const { error } = await supabase.from("objectives_v2").update(patch).in("id", ids);
     if (error) console.error("[objectives] bulk bucket", error);
@@ -519,6 +546,10 @@ export default function Objectives() {
     if (!ids.length) return;
     const patch = { day };
     if (day) patch.bucket = "thisWeek";
+    const items = tasks
+      .filter(t => selectedIds.has(t.id))
+      .map(t => ({ id: t.id, priorBucket: t.bucket ?? null, priorDay: t.day ?? null }));
+    recordAction({ kind: "bulkSetDay", items });
     setTasks(ts => ts.map(t => (selectedIds.has(t.id) ? { ...t, ...patch } : t)));
     const { error } = await supabase.from("objectives_v2").update(patch).in("id", ids);
     if (error) console.error("[objectives] bulk day", error);
@@ -528,10 +559,94 @@ export default function Objectives() {
     const ids = Array.from(selectedIds);
     if (!ids.length) return;
     const now = Date.now();
+    const items = tasks
+      .filter(t => selectedIds.has(t.id))
+      .map(t => ({ id: t.id, priorDoneAt: t.done_at ?? null }));
+    recordAction({ kind: "bulkMarkDone", items });
     setTasks(ts => ts.map(t => (selectedIds.has(t.id) ? { ...t, done_at: now } : t)));
     setSelectedIds(new Set());
     const { error } = await supabase.from("objectives_v2").update({ done_at: now }).in("id", ids);
     if (error) console.error("[objectives] bulk mark done", error);
+  };
+
+  const undoLast = async () => {
+    if (!lastAction) return;
+    const a = lastAction;
+    setLastAction(null);
+    try {
+      switch (a.kind) {
+        case "markDone":
+        case "restoreDone": {
+          updateLocal(a.id, { done_at: a.priorDoneAt });
+          const { error } = await supabase.from("objectives_v2").update({ done_at: a.priorDoneAt }).eq("id", a.id);
+          if (error) console.error("[undo]", error);
+          break;
+        }
+        case "hardDelete": {
+          setTasks(ts => [...ts, a.task].sort((x, y) => (y.position ?? 0) - (x.position ?? 0) || (y.created ?? 0) - (x.created ?? 0)));
+          const { error } = await supabase.from("objectives_v2").insert(a.task);
+          if (error) console.error("[undo]", error);
+          break;
+        }
+        case "editText": {
+          updateLocal(a.id, { text: a.priorText });
+          const { error } = await supabase.from("objectives_v2").update({ text: a.priorText }).eq("id", a.id);
+          if (error) console.error("[undo]", error);
+          break;
+        }
+        case "setBucket":
+        case "setDay": {
+          const patch = { bucket: a.priorBucket, day: a.priorDay };
+          updateLocal(a.id, patch);
+          const { error } = await supabase.from("objectives_v2").update(patch).eq("id", a.id);
+          if (error) console.error("[undo]", error);
+          break;
+        }
+        case "addTask": {
+          setTasks(ts => ts.filter(t => t.id !== a.id));
+          const { error } = await supabase.from("objectives_v2").delete().eq("id", a.id);
+          if (error) console.error("[undo]", error);
+          break;
+        }
+        case "bulkMarkDone": {
+          const idMap = new Map(a.items.map(i => [i.id, i.priorDoneAt]));
+          setTasks(ts => ts.map(t => (idMap.has(t.id) ? { ...t, done_at: idMap.get(t.id) } : t)));
+          await Promise.all(
+            a.items.map(it =>
+              supabase.from("objectives_v2").update({ done_at: it.priorDoneAt }).eq("id", it.id)
+            )
+          );
+          break;
+        }
+        case "bulkSetBucket":
+        case "bulkSetDay":
+        case "resetAll": {
+          const idMap = new Map(a.items.map(i => [i.id, { bucket: i.priorBucket, day: i.priorDay }]));
+          setTasks(ts => ts.map(t => (idMap.has(t.id) ? { ...t, ...idMap.get(t.id) } : t)));
+          await Promise.all(
+            a.items.map(it =>
+              supabase
+                .from("objectives_v2")
+                .update({ bucket: it.priorBucket, day: it.priorDay })
+                .eq("id", it.id)
+            )
+          );
+          break;
+        }
+        case "restoreLost": {
+          const idSet = new Set(a.ids);
+          setTasks(ts => ts.filter(t => !idSet.has(t.id)));
+          const { error } = await supabase.from("objectives_v2").delete().in("id", a.ids);
+          if (error) console.error("[undo]", error);
+          break;
+        }
+        default:
+          break;
+      }
+    } catch (e) {
+      console.error("[undo] exception", e);
+    }
+    showToast("Undone", 2000);
   };
 
   const counts = useMemo(() => {
@@ -701,9 +816,9 @@ export default function Objectives() {
   if (!loaded) {
     body = <div style={{ color: "#555", fontSize: 13, padding: "40px 0", textAlign: "center" }}>Loading…</div>;
   } else if (tab === "thisWeek") {
-    const groups = { UNASSIGNED: [], FRI: [], SAT: [], SUN: [], MON: [], TUE: [], WED: [], THU: [] };
+    const groups = { UNASSIGNED: [], SUN: [], MON: [], TUE: [], WED: [], THU: [], FRI: [], SAT: [] };
     for (const t of visible) groups[t.day || "UNASSIGNED"].push(t);
-    const order = ["UNASSIGNED", ...DAYS];
+    const order = ["UNASSIGNED", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     let idx = 0;
     body = (
       <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
@@ -727,17 +842,7 @@ export default function Objectives() {
                 }}
               >
                 <span>{d}</span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: "#666",
-                    background: "#1a1a1a",
-                    border: "1px solid #2a2a2a",
-                    borderRadius: 6,
-                    padding: "2px 7px",
-                    letterSpacing: 0,
-                  }}
-                >
+                <span style={{ fontSize: 11, color: "#555", letterSpacing: 0, fontWeight: 500 }}>
                   {list.length}
                 </span>
               </div>
@@ -883,6 +988,15 @@ export default function Objectives() {
           </button>
           <button className="obj-btn" onClick={resetAll}>
             RESET
+          </button>
+          <button
+            className="obj-btn"
+            onClick={undoLast}
+            disabled={!lastAction}
+            style={!lastAction ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+            title={lastAction ? "Undo your last action" : "Nothing to undo"}
+          >
+            ↶ UNDO
           </button>
           <button className="obj-btn" onClick={restoreLost} title="Re-add original seed tasks that were deleted">
             RESTORE LOST
@@ -1143,6 +1257,7 @@ export default function Objectives() {
           transition: background .12s, border-color .12s, color .12s;
         }
         .obj-btn:hover { background: #141414; color: #fff; border-color: #3a3a3a; }
+        .obj-btn:disabled, .obj-btn:disabled:hover { background: transparent; color: #555; border-color: #1f1f1f; cursor: not-allowed; }
         .obj-btn-primary {
           background: #fff;
           color: #000;
