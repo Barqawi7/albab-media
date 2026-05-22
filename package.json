@@ -1,6 +1,6 @@
 {
-  "name": "albab-media",
-  "version": "2.0.0",
+  "name": "bab-dashboard",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
