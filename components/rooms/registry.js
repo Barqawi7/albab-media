@@ -17,6 +17,7 @@ import Maps from './Maps';
 import Life from './Life';
 import Home from './Home';
 import Gmail from './Gmail';
+import AIAssistant from './AIAssistant';
 
 export const GROUPS = [
   {
@@ -55,7 +56,7 @@ export const GROUPS = [
     label: 'Comms',
     rooms: [
       { slug: 'gmail', label: 'Gmail', component: Gmail },
-      { slug: 'ai-assistant', label: 'AI Assistant' },
+      { slug: 'ai-assistant', label: 'AI Assistant', component: AIAssistant },
     ],
   },
   {
