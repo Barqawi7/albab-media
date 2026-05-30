@@ -14,6 +14,7 @@ import Content from './Content';
 import Sales from './Sales';
 import Finance from './Finance';
 import Maps from './Maps';
+import Life from './Life';
 
 export const GROUPS = [
   {
@@ -61,7 +62,7 @@ export const GROUPS = [
       { slug: 'tasks', label: 'Tasks', component: Tasks },
       { slug: 'ideas', label: 'Ideas', component: Ideas },
       { slug: 'maps', label: 'Maps', component: Maps },
-      { slug: 'life', label: 'Life' },
+      { slug: 'life', label: 'Life', component: Life },
     ],
   },
 ];
