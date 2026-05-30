@@ -12,6 +12,7 @@ import Marketing from './Marketing';
 import SocialAlgorithm from './SocialAlgorithm';
 import Content from './Content';
 import Sales from './Sales';
+import Finance from './Finance';
 
 export const GROUPS = [
   {
@@ -24,7 +25,7 @@ export const GROUPS = [
     label: 'Business',
     rooms: [
       { slug: 'sales', label: 'Sales', component: Sales },
-      { slug: 'finance', label: 'Finance' },
+      { slug: 'finance', label: 'Finance', component: Finance },
       { slug: 'clients', label: 'Clients', component: Clients },
     ],
   },
