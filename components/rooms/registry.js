@@ -8,6 +8,7 @@ import Tasks from './Tasks';
 import Ideas from './Ideas';
 import Events from './Events';
 import QuickComments from './QuickComments';
+import Marketing from './Marketing';
 
 export const GROUPS = [
   {
@@ -35,7 +36,7 @@ export const GROUPS = [
   {
     label: 'Content & Marketing',
     rooms: [
-      { slug: 'marketing', label: 'Marketing' },
+      { slug: 'marketing', label: 'Marketing', component: Marketing },
       { slug: 'social-algorithm', label: 'Social Algorithm' },
       { slug: 'content', label: 'Content' },
       { slug: 'events', label: 'Events', component: Events },
