@@ -15,12 +15,13 @@ import Sales from './Sales';
 import Finance from './Finance';
 import Maps from './Maps';
 import Life from './Life';
+import Home from './Home';
 
 export const GROUPS = [
   {
     label: 'Workspace',
     rooms: [
-      { slug: 'home', label: 'Home' },
+      { slug: 'home', label: 'Home', component: Home },
     ],
   },
   {
