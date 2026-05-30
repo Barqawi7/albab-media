@@ -4,6 +4,7 @@ import Influencers from './Influencers';
 import Clients from './Clients';
 import Models from './Models';
 import Connections from './Connections';
+import Tasks from './Tasks';
 
 export const GROUPS = [
   {
@@ -48,7 +49,7 @@ export const GROUPS = [
   {
     label: 'Personal',
     rooms: [
-      { slug: 'tasks', label: 'Tasks' },
+      { slug: 'tasks', label: 'Tasks', component: Tasks },
       { slug: 'ideas', label: 'Ideas' },
       { slug: 'maps', label: 'Maps' },
       { slug: 'life', label: 'Life' },
