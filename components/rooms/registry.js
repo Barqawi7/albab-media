@@ -2,6 +2,7 @@
 // Round 2: add `component: SomeRoom` to a room entry to replace Placeholder.
 import Influencers from './Influencers';
 import Clients from './Clients';
+import Models from './Models';
 
 export const GROUPS = [
   {
@@ -22,7 +23,7 @@ export const GROUPS = [
     label: 'People',
     rooms: [
       { slug: 'influencers', label: 'Influencers', component: Influencers },
-      { slug: 'models', label: 'Models' },
+      { slug: 'models', label: 'Models', component: Models },
       { slug: 'connections', label: 'Connections' },
     ],
   },
