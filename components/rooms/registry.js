@@ -3,6 +3,7 @@
 import Influencers from './Influencers';
 import Clients from './Clients';
 import Models from './Models';
+import Connections from './Connections';
 
 export const GROUPS = [
   {
@@ -24,7 +25,7 @@ export const GROUPS = [
     rooms: [
       { slug: 'influencers', label: 'Influencers', component: Influencers },
       { slug: 'models', label: 'Models', component: Models },
-      { slug: 'connections', label: 'Connections' },
+      { slug: 'connections', label: 'Connections', component: Connections },
     ],
   },
   {
