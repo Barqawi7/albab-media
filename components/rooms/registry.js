@@ -7,6 +7,7 @@ import Connections from './Connections';
 import Tasks from './Tasks';
 import Ideas from './Ideas';
 import Events from './Events';
+import QuickComments from './QuickComments';
 
 export const GROUPS = [
   {
@@ -38,7 +39,7 @@ export const GROUPS = [
       { slug: 'social-algorithm', label: 'Social Algorithm' },
       { slug: 'content', label: 'Content' },
       { slug: 'events', label: 'Events', component: Events },
-      { slug: 'quick-comments', label: 'Quick Comments' },
+      { slug: 'quick-comments', label: 'Quick Comments', component: QuickComments },
     ],
   },
   {
