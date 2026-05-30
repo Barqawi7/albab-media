@@ -13,6 +13,7 @@ import SocialAlgorithm from './SocialAlgorithm';
 import Content from './Content';
 import Sales from './Sales';
 import Finance from './Finance';
+import Maps from './Maps';
 
 export const GROUPS = [
   {
@@ -59,7 +60,7 @@ export const GROUPS = [
     rooms: [
       { slug: 'tasks', label: 'Tasks', component: Tasks },
       { slug: 'ideas', label: 'Ideas', component: Ideas },
-      { slug: 'maps', label: 'Maps' },
+      { slug: 'maps', label: 'Maps', component: Maps },
       { slug: 'life', label: 'Life' },
     ],
   },
