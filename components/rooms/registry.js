@@ -6,6 +6,7 @@ import Models from './Models';
 import Connections from './Connections';
 import Tasks from './Tasks';
 import Ideas from './Ideas';
+import Events from './Events';
 
 export const GROUPS = [
   {
@@ -36,7 +37,7 @@ export const GROUPS = [
       { slug: 'marketing', label: 'Marketing' },
       { slug: 'social-algorithm', label: 'Social Algorithm' },
       { slug: 'content', label: 'Content' },
-      { slug: 'events', label: 'Events' },
+      { slug: 'events', label: 'Events', component: Events },
       { slug: 'quick-comments', label: 'Quick Comments' },
     ],
   },
