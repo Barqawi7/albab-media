@@ -10,6 +10,7 @@ import Events from './Events';
 import QuickComments from './QuickComments';
 import Marketing from './Marketing';
 import SocialAlgorithm from './SocialAlgorithm';
+import Content from './Content';
 
 export const GROUPS = [
   {
@@ -39,7 +40,7 @@ export const GROUPS = [
     rooms: [
       { slug: 'marketing', label: 'Marketing', component: Marketing },
       { slug: 'social-algorithm', label: 'Social Algorithm', component: SocialAlgorithm },
-      { slug: 'content', label: 'Content' },
+      { slug: 'content', label: 'Content', component: Content },
       { slug: 'events', label: 'Events', component: Events },
       { slug: 'quick-comments', label: 'Quick Comments', component: QuickComments },
     ],
