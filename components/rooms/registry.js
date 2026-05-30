@@ -1,6 +1,7 @@
 // Source of truth for sidebar order, room slugs, and labels.
 // Round 2: add `component: SomeRoom` to a room entry to replace Placeholder.
 import Influencers from './Influencers';
+import Clients from './Clients';
 
 export const GROUPS = [
   {
@@ -14,7 +15,7 @@ export const GROUPS = [
     rooms: [
       { slug: 'sales', label: 'Sales' },
       { slug: 'finance', label: 'Finance' },
-      { slug: 'clients', label: 'Clients' },
+      { slug: 'clients', label: 'Clients', component: Clients },
     ],
   },
   {
