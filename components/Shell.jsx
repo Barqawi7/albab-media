@@ -1,7 +1,7 @@
 import Sidebar from './Sidebar';
 import { theme } from '../lib/theme';
 
-export default function Shell({ currentSlug, userEmail, children }) {
+export default function Shell({ currentSlug, children }) {
   return (
     <div
       style={{
@@ -12,7 +12,7 @@ export default function Shell({ currentSlug, userEmail, children }) {
         fontFamily: theme.font,
       }}
     >
-      <Sidebar currentSlug={currentSlug} userEmail={userEmail} />
+      <Sidebar currentSlug={currentSlug} />
       <main style={{ flex: 1, minWidth: 0, overflowX: 'hidden' }}>
         {children}
       </main>

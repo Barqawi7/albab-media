@@ -1,13 +1,8 @@
 import Link from 'next/link';
 import { GROUPS } from './rooms/registry';
 import { theme } from '../lib/theme';
-import { supabase } from '../lib/supabase';
 
-export default function Sidebar({ currentSlug, userEmail }) {
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-
+export default function Sidebar({ currentSlug }) {
   return (
     <aside
       style={{
@@ -85,25 +80,6 @@ export default function Sidebar({ currentSlug, userEmail }) {
         ))}
       </nav>
 
-      <div style={{ padding: '14px 22px', borderTop: `1px solid ${theme.border}`, fontSize: 11 }}>
-        <div style={{ color: theme.textDim, marginBottom: 6, wordBreak: 'break-all' }}>
-          {userEmail || 'Not signed in'}
-        </div>
-        <button
-          onClick={signOut}
-          style={{
-            background: 'transparent',
-            border: `1px solid ${theme.border}`,
-            color: theme.textDim,
-            borderRadius: 6,
-            padding: '4px 10px',
-            fontSize: 11,
-            cursor: 'pointer',
-          }}
-        >
-          Sign out
-        </button>
-      </div>
     </aside>
   );
 }

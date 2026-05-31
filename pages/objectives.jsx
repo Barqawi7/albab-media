@@ -42,9 +42,9 @@ const NOW_WEEK = isoWeekFromDate(new Date());
 // prop-drilling. Updated on every render of the cells.
 const tasksLookup = new Map();
 
-export default function ObjectivesPage({ session }) {
+export default function ObjectivesPage() {
   return (
-    <Shell currentSlug={null} userEmail={session?.user?.email}>
+    <Shell currentSlug={null}>
       <ObjectivesView />
     </Shell>
   );

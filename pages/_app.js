@@ -1,5 +1,3 @@
-import AuthGate from '../components/AuthGate';
-
 export default function MyApp({ Component, pageProps }) {
   return (
     <>
@@ -18,9 +16,7 @@ export default function MyApp({ Component, pageProps }) {
         ::-webkit-scrollbar-track { background: transparent; }
         @keyframes bab-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
-      <AuthGate>
-        {(session) => <Component {...pageProps} session={session} />}
-      </AuthGate>
+      <Component {...pageProps} />
     </>
   );
 }
