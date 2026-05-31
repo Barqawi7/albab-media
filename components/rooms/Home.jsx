@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
+import { fmtCompact } from './_RoomShell';
 
 const TILES = [
   { slug: 'influencers',  table: 'influencers_comprehensive', label: 'Influencers' },
@@ -79,7 +80,7 @@ export default function Home() {
             <div style={tileStyle}>
               <div style={{ fontSize: 11, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{t.label}</div>
               <div style={{ fontSize: 26, fontWeight: 800, color: theme.gold, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>
-                {loading ? '—' : (counts[t.table] ?? 0).toLocaleString()}
+                {loading ? '—' : fmtCompact(counts[t.table] ?? 0)}
               </div>
             </div>
           </Link>
@@ -102,7 +103,7 @@ export default function Home() {
                       <>
                         <div style={{ color: theme.text }}>{d.deal_name || '(unnamed)'}</div>
                         <div style={{ color: theme.textMuted, fontSize: 11 }}>
-                          {d.client || '—'} · {d.stage} · {d.value_aed ? Number(d.value_aed).toLocaleString() + ' AED' : '—'}
+                          {d.client || '—'} · {d.stage} · {d.value_aed ? fmtCompact(d.value_aed) + ' AED' : '—'}
                         </div>
                       </>
                     )} />
@@ -130,7 +131,7 @@ function BigStat({ label, value, color }) {
         {label}
       </div>
       <div style={{ fontSize: 30, fontWeight: 800, color, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
-        {Math.round(value || 0).toLocaleString()}
+        {fmtCompact(value || 0)}
       </div>
     </div>
   );

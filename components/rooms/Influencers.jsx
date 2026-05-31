@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
+import { fmtCompact } from './_RoomShell';
 
 const TABS = [
   { key: 'influencers_comprehensive', label: 'Comprehensive' },
@@ -22,14 +23,10 @@ const EMPTY = {
   email: '', phone: '', whatsapp: '', manager_name: '',
 };
 
-function fmtFollowers(n) {
-  if (n == null || n === '') return '';
-  const v = Number(n);
-  if (!Number.isFinite(v)) return '';
-  if (v >= 1_000_000) return (v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1) + 'M';
-  if (v >= 1_000)     return (v / 1_000).toFixed(v >= 10_000 ? 0 : 1) + 'K';
-  return String(v);
-}
+const fmtFollowers = (n) => {
+  if (n == null || n === '' || n === 0) return '';
+  return fmtCompact(n);
+};
 
 function totalFollowers(row) {
   return PLATFORMS.reduce((sum, p) => {
@@ -191,7 +188,7 @@ export default function Influencers() {
               {r.niche || '—'}
             </div>
             <div style={{ flex: 0.9, textAlign: 'right', color: theme.text, fontVariantNumeric: 'tabular-nums' }}>
-              {r.rate_aed != null && r.rate_aed !== '' ? Number(r.rate_aed).toLocaleString() : '—'}
+              {r.rate_aed != null && r.rate_aed !== '' ? fmtCompact(r.rate_aed) : '—'}
             </div>
             <div style={{ flex: 0.8 }}>
               <StatusPill value={r.status} />

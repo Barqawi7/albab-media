@@ -26,7 +26,7 @@
 --   0015 — Maps (map_locations)
 --   0016 — Life areas
 --   0017 — AI Assistant (new table ai_conversations)
---   0018 — Finance modules: new tables invoices, quotations, expenses, cash_accounts
+--   0018 — Finance modules: invoices, quotations, expenses, cash_accounts
 -- =============================================================================
 
 
@@ -631,8 +631,7 @@ create index if not exists expenses_item_idx on public.expenses (item);
 
 -- Cash accounts
 alter table public.cash_accounts
-  add column if not exists name    text,
-  add column if not exists balance numeric default 0,
-  add column if not exists notes   text;
+  add column if not exists account text,
+  add column if not exists balance numeric default 0;
 
-create index if not exists cash_accounts_name_idx on public.cash_accounts (name);
+create index if not exists cash_accounts_account_idx on public.cash_accounts (account);

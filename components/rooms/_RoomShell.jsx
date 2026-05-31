@@ -181,7 +181,7 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults, kpisFrom
               if (c.render) content = c.render(raw, r);
               else if (c.format) content = c.format(raw, r);
               else if (raw == null || raw === '') content = '—';
-              else if (c.type === 'currency_aed') content = Number(raw).toLocaleString();
+              else if (c.type === 'currency_aed') content = fmtCompact(raw);
               else content = String(raw);
               return (
                 <div key={c.key} style={{
@@ -407,6 +407,24 @@ export const fmtNumber = (v) => {
   return Number.isFinite(n) ? n.toLocaleString() : String(v);
 };
 
+// Compact human-friendly numbers: 999 → "999", 1500 → "1.5K", 1000 → "1K",
+// 2345 → "2.3K", 1_000_000 → "1M", 57_500_000 → "57.5M". Strips trailing ".0".
+export const fmtCompact = (v) => {
+  if (v == null || v === '') return '—';
+  const n = Number(v);
+  if (!Number.isFinite(n)) return String(v);
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs < 1000) return sign + Math.round(abs).toString();
+  let value, suffix;
+  if (abs < 1_000_000)       { value = abs / 1_000;         suffix = 'K'; }
+  else if (abs < 1_000_000_000) { value = abs / 1_000_000;  suffix = 'M'; }
+  else                       { value = abs / 1_000_000_000; suffix = 'B'; }
+  const rounded = Math.round(value * 10) / 10;
+  const str = rounded % 1 === 0 ? String(Math.round(rounded)) : rounded.toFixed(1);
+  return sign + str + suffix;
+};
+
 // ---- shared style helpers (also useful for custom pages like CashFlow) ----
 export const KPIBox = ({ label, value, color, suffix, loading }) => (
   <div style={{
@@ -424,7 +442,7 @@ export const KPIBox = ({ label, value, color, suffix, loading }) => (
     }}>
       {loading ? <LoadingSpinner /> : (
         <>
-          <span>{typeof value === 'number' ? Math.round(value).toLocaleString() : value}</span>
+          <span>{typeof value === 'number' ? fmtCompact(value) : value}</span>
           {suffix && <span style={{ fontSize: 13, color: theme.textMuted, fontWeight: 500 }}>{suffix}</span>}
         </>
       )}

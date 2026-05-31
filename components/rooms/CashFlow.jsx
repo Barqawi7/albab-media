@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
 import { Toast, useUndoToast, LoadingSpinner } from '../Toast';
-import { KPIBox } from './_RoomShell';
+import { KPIBox, fmtCompact } from './_RoomShell';
 
 export default function CashFlow() {
   const [cashAccounts, setCashAccounts] = useState([]);
@@ -45,7 +45,7 @@ export default function CashFlow() {
 
   // ---- cash accounts ----
   async function addCashAccount() {
-    const payload = { name: 'New account', balance: 0 };
+    const payload = { account: 'New account', balance: 0 };
     const { data, error } = await supabase.from('cash_accounts').insert(payload).select().single();
     if (error) { setError(error.message); return; }
     setCashAccounts((xs) => [...xs, data]);
@@ -143,7 +143,7 @@ export default function CashFlow() {
         {/* Cash accounts */}
         <Section title="Cash accounts" loading={loading}
                  onAdd={addCashAccount}
-                 footerLabel={`Subtotal: ${Math.round(totalCash).toLocaleString()} AED`}>
+                 footerLabel={`Subtotal: ${fmtCompact(totalCash)} AED`}>
           <RowHeader cols={[{ label: 'Account', flex: 2 }, { label: 'Balance', flex: 1, align: 'right' }, { label: '', flex: 0.4 }]} />
           {!loading && cashAccounts.length === 0 && (
             <Empty>No cash accounts yet.</Empty>
@@ -151,8 +151,8 @@ export default function CashFlow() {
           {cashAccounts.map((r) => (
             <ItemRow key={r.id}>
               <InlineText
-                value={r.name || ''}
-                onCommit={(v) => updateCashAccount(r, { name: v })}
+                value={r.account || ''}
+                onCommit={(v) => updateCashAccount(r, { account: v })}
                 placeholder="Account name"
                 flex={2}
               />
@@ -169,7 +169,7 @@ export default function CashFlow() {
         {/* Expenses */}
         <Section title="Expenses" loading={loading}
                  onAdd={addExpense}
-                 footerLabel={`Total: ${Math.round(totalExpenses).toLocaleString()} AED`}>
+                 footerLabel={`Total: ${fmtCompact(totalExpenses)} AED`}>
           <RowHeader cols={[{ label: 'Item', flex: 2 }, { label: 'Amount', flex: 1, align: 'right' }, { label: '', flex: 0.4 }]} />
           {!loading && expenses.length === 0 && (
             <Empty>No expenses yet.</Empty>
