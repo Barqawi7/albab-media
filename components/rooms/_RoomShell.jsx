@@ -1,22 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
+import { Toast, useUndoToast, LoadingSpinner } from '../Toast';
 
 // Generic schema-driven room shell.
 //
-// Usage:
-//   <RoomShell
-//     title="Clients"
-//     group="Business"
-//     tabs={[{ key: 'clients', label: 'Clients', fields, columns }]}
-//   />
-//
-// `fields` describes every editable field; `columns` selects which to show
-// in the table view (in order). Both are arrays of objects:
-//   { key, label, type?, section?, options?, placeholder?, prefix?, multiline?,
-//     format?(value, row), align?, flex?, render?(value, row), search? }
-//
-// Supported types: 'text' (default), 'number', 'select', 'date', 'textarea', 'currency_aed'
+// Tab shape:
+//   {
+//     key:     'table_name',
+//     label:   'Tab label',
+//     fields:  [{ key, label, type?, section?, options?, placeholder?, prefix?, multiline?, full? }],
+//     columns: [{ key, label, type?, flex?, align?, render?(value, row), format?(value, row) }],
+//     addLabel: 'Invoice',
+//     defaults: { status: 'pending' },
+//     kpisFromRows: (rows) => <KPIRow ... />   // optional, rendered above the table
+//   }
 
 export default function RoomShell({ title, group, tabs }) {
   const [tabIdx, setTabIdx] = useState(0);
@@ -64,12 +62,13 @@ export default function RoomShell({ title, group, tabs }) {
   );
 }
 
-function TabBody({ key: tableName, fields, columns, addLabel, defaults }) {
+function TabBody({ key: tableName, fields, columns, addLabel, defaults, kpisFromRows }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState(null);
+  const { toast, show: showToast, dismiss: dismissToast, runUndo } = useUndoToast();
 
   const EMPTY = useMemo(() => emptyRecord(fields, defaults), [fields, defaults]);
 
@@ -83,6 +82,32 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults }) {
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [tableName]);
+
+  // Strip id/timestamps before re-inserting / reverting
+  function clean(row) {
+    const { id, created_at, updated_at, ...rest } = row;
+    return rest;
+  }
+
+  async function registerUndo(change) {
+    if (change.kind === 'insert') {
+      showToast(`Created ${addLabel?.toLowerCase() || 'record'}.`, async () => {
+        await supabase.from(tableName).delete().eq('id', change.id);
+        load();
+      });
+    } else if (change.kind === 'update') {
+      showToast(`Updated ${addLabel?.toLowerCase() || 'record'}.`, async () => {
+        await supabase.from(tableName).update(clean(change.before)).eq('id', change.id);
+        load();
+      });
+    } else if (change.kind === 'delete') {
+      showToast(`Deleted ${addLabel?.toLowerCase() || 'record'}.`, async () => {
+        await supabase.from(tableName).insert({ id: change.row.id, ...clean(change.row) });
+        load();
+      });
+    }
+    load();
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -98,6 +123,12 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults }) {
 
   return (
     <>
+      {kpisFromRows && (
+        <div style={{ marginTop: 20 }}>
+          {kpisFromRows(rows, { loading })}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '16px 0 12px', flexWrap: 'wrap' }}>
         <input
           value={query}
@@ -105,7 +136,8 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults }) {
           placeholder="Search…"
           style={{ ...inputStyle, flex: 1, minWidth: 240 }}
         />
-        <div style={{ color: theme.textMuted, fontSize: 12 }}>
+        <div style={{ color: theme.textMuted, fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          {loading && <LoadingSpinner size={12} />}
           {loading ? 'loading…' : `${filtered.length} of ${rows.length}`}
         </div>
         <button onClick={() => setEditing({ ...EMPTY })} style={primaryBtn}>
@@ -125,12 +157,17 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults }) {
             </div>
           ))}
         </div>
+        {loading && (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: theme.textMuted, fontSize: 13, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+            <LoadingSpinner /> Loading…
+          </div>
+        )}
         {!loading && filtered.length === 0 && (
           <div style={{ padding: '40px 20px', textAlign: 'center', color: theme.textMuted, fontSize: 13 }}>
             {rows.length === 0 ? `No ${addLabel?.toLowerCase() || 'records'} yet.` : 'No matches.'}
           </div>
         )}
-        {filtered.map((r) => (
+        {!loading && filtered.map((r) => (
           <div
             key={r.id}
             onClick={() => setEditing(r)}
@@ -168,10 +205,11 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults }) {
           tableName={tableName}
           addLabel={addLabel}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); }}
-          onDeleted={() => { setEditing(null); load(); }}
+          onChange={(change) => { setEditing(null); registerUndo(change); }}
         />
       )}
+
+      <Toast toast={toast} onUndo={runUndo} onDismiss={dismissToast} />
     </>
   );
 }
@@ -186,7 +224,7 @@ function emptyRecord(fields, defaults) {
   return out;
 }
 
-function EditDrawer({ row, fields, tableName, addLabel, onClose, onSaved, onDeleted }) {
+function EditDrawer({ row, fields, tableName, addLabel, onClose, onChange }) {
   const isNew = !row.id;
   const [form, setForm] = useState(() => {
     const base = {};
@@ -225,19 +263,24 @@ function EditDrawer({ row, fields, tableName, addLabel, onClose, onSaved, onDele
     const q = isNew
       ? supabase.from(tableName).insert(payload).select().single()
       : supabase.from(tableName).update(payload).eq('id', row.id).select().single();
-    const { error } = await q;
+    const { data, error } = await q;
     setSaving(false);
     if (error) { setErr(error.message); return; }
-    onSaved();
+
+    if (isNew) {
+      onChange({ kind: 'insert', id: data.id, row: data });
+    } else {
+      onChange({ kind: 'update', id: row.id, before: row, after: data });
+    }
   }
 
   async function remove() {
-    if (!confirm(`Delete this ${addLabel?.toLowerCase() || 'record'}? This cannot be undone.`)) return;
+    if (!confirm(`Delete this ${addLabel?.toLowerCase() || 'record'}? You'll have 5 seconds to undo.`)) return;
     setSaving(true);
     const { error } = await supabase.from(tableName).delete().eq('id', row.id);
     setSaving(false);
     if (error) { setErr(error.message); return; }
-    onDeleted();
+    onChange({ kind: 'delete', id: row.id, row });
   }
 
   return (
@@ -334,9 +377,9 @@ function FieldRender({ field, value, onChange }) {
 export const StatusPill = ({ value, palette }) => {
   const v = value || '—';
   const map = palette || {
-    active: theme.green, done: theme.green, won: theme.green, received: theme.green, published: theme.green,
+    active: theme.green, done: theme.green, won: theme.green, awarded: theme.green, received: theme.green, published: theme.green, accepted: theme.green,
     paused: theme.amber, doing: theme.amber, scheduled: theme.amber, planned: theme.amber, sent: theme.amber, pending: theme.amber, lead: theme.amber,
-    blacklist: theme.red, lost: theme.red, cancelled: theme.red, rejected: theme.red, dormant: theme.red,
+    blacklist: theme.red, lost: theme.red, dropped: theme.red, cancelled: theme.red, rejected: theme.red, dormant: theme.red, expired: theme.red,
     todo: theme.blue, draft: theme.textDim, idea: theme.blue, exploring: theme.blue, raw: theme.textDim, parked: theme.textMuted,
   };
   const color = map[String(v).toLowerCase()] || theme.textDim;
@@ -363,6 +406,31 @@ export const fmtNumber = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n.toLocaleString() : String(v);
 };
+
+// ---- shared style helpers (also useful for custom pages like CashFlow) ----
+export const KPIBox = ({ label, value, color, suffix, loading }) => (
+  <div style={{
+    padding: '16px 18px', borderRadius: 12,
+    background: theme.bg2, border: `1px solid ${theme.border}`,
+    minWidth: 0,
+  }}>
+    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: theme.textMuted, textTransform: 'uppercase' }}>
+      {label}
+    </div>
+    <div style={{
+      fontSize: 26, fontWeight: 800, marginTop: 6, fontVariantNumeric: 'tabular-nums',
+      color: color || theme.gold,
+      display: 'flex', alignItems: 'center', gap: 8,
+    }}>
+      {loading ? <LoadingSpinner /> : (
+        <>
+          <span>{typeof value === 'number' ? Math.round(value).toLocaleString() : value}</span>
+          {suffix && <span style={{ fontSize: 13, color: theme.textMuted, fontWeight: 500 }}>{suffix}</span>}
+        </>
+      )}
+    </div>
+  </div>
+);
 
 // ---- styles ----
 const fieldLabel = { fontSize: 10, fontWeight: 700, letterSpacing: 1, color: theme.textMuted, textTransform: 'uppercase' };

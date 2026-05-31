@@ -16,6 +16,7 @@ export default function MyApp({ Component, pageProps }) {
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-thumb { background: #2E3A4B; border-radius: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
+        @keyframes bab-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
       <AuthGate>
         {(session) => <Component {...pageProps} session={session} />}

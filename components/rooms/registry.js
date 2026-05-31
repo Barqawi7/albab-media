@@ -18,6 +18,10 @@ import Life from './Life';
 import Home from './Home';
 import Gmail from './Gmail';
 import AIAssistant from './AIAssistant';
+import Invoices from './Invoices';
+import Quotations from './Quotations';
+import Expenses from './Expenses';
+import CashFlow from './CashFlow';
 
 export const GROUPS = [
   {
@@ -29,9 +33,13 @@ export const GROUPS = [
   {
     label: 'Business',
     rooms: [
-      { slug: 'sales', label: 'Sales', component: Sales },
-      { slug: 'finance', label: 'Finance', component: Finance },
-      { slug: 'clients', label: 'Clients', component: Clients },
+      { slug: 'cash-flow',  label: 'Cash Flow',  component: CashFlow },
+      { slug: 'invoices',   label: 'Invoices',   component: Invoices },
+      { slug: 'quotations', label: 'Quotations', component: Quotations },
+      { slug: 'expenses',   label: 'Expenses',   component: Expenses },
+      { slug: 'sales',      label: 'Sales',      component: Sales },
+      { slug: 'finance',    label: 'Finance',    component: Finance },
+      { slug: 'clients',    label: 'Clients',    component: Clients },
     ],
   },
   {
