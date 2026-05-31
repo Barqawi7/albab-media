@@ -1,99 +1,162 @@
 import { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
-import { fmtCompact, KPIBox, fmtNumber } from './_RoomShell';
+import { fmtCompact, fmtNumber, KPIBox } from './_RoomShell';
 import { fetchAllRows } from '../../lib/fetchAll';
+import { Toast, useUndoToast, LoadingSpinner } from '../Toast';
 
-const TABS = [
-  { key: 'influencers_comprehensive', label: 'Comprehensive' },
-  { key: 'influencers_focused',       label: 'Focused' },
-];
-
-const STATUS_OPTIONS = ['active', 'paused', 'blacklist'];
-const PLATFORMS = ['instagram', 'tiktok', 'youtube', 'x_twitter', 'snapchat'];
+const TABLE = 'influencers_master';
+const TIER_OPTIONS = ['Mega', 'Macro', 'Mid', 'Micro', 'Nano'];
+const TIER_COLORS = {
+  Mega:  '#A78BFA',
+  Macro: theme.blue,
+  Mid:   theme.gold,
+  Micro: theme.green,
+  Nano:  theme.textDim,
+  Other: theme.textMuted,
+};
 
 const EMPTY = {
-  name: '', country: '', city: '',
-  instagram: '', tiktok: '', youtube: '', x_twitter: '', snapchat: '',
-  followers_instagram: '', followers_tiktok: '', followers_youtube: '',
-  followers_x: '', followers_snapchat: '',
-  primary_platform: '',
-  niche: '', category: '', languages: '',
-  rate_aed: '', payment_terms: '', currency_notes: '',
-  status: 'active', notes: '',
-  email: '', phone: '', whatsapp: '', manager_name: '',
+  rank: '', name: '', ig_handle: '', tier: '', category: '',
+  city: '', nationality: '',
+  ig_followers: '', tiktok_followers: '', youtube_subscribers: '',
+  total_reach: '', engagement: '', est_rate: '',
 };
 
-const fmtFollowers = (n) => {
-  if (n == null || n === '' || n === 0) return '';
-  return fmtCompact(n);
-};
-
-function totalFollowers(row) {
-  return PLATFORMS.reduce((sum, p) => {
-    const col = p === 'x_twitter' ? 'followers_x' : `followers_${p}`;
-    const v = Number(row?.[col]);
-    return sum + (Number.isFinite(v) ? v : 0);
-  }, 0);
-}
-
-const TIER_OPTIONS = ['Mega', 'Macro', 'Mid', 'Micro'];
-
-function tierFor(totalReach) {
-  if (totalReach >= 10_000_000) return 'Mega';
-  if (totalReach >=  1_000_000) return 'Macro';
-  if (totalReach >=    100_000) return 'Mid';
-  return 'Micro';
+function tierKey(t) {
+  const v = (t == null ? '' : String(t)).trim();
+  if (!v) return 'Other';
+  for (const opt of TIER_OPTIONS) if (opt.toLowerCase() === v.toLowerCase()) return opt;
+  return 'Other';
 }
 
 export default function Influencers() {
-  const [tab, setTab] = useState(TABS[0].key);
   const [rows, setRows] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [tierFilter, setTierFilter] = useState('all');
+
+  const [query, setQuery]             = useState('');
+  const [tierFilter, setTierFilter]   = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
   const [editing, setEditing] = useState(null);
+  const undo = useUndoToast();
 
   async function load() {
-    setLoading(true);
-    setError(null);
-    const { rows, count, error } = await fetchAllRows(tab, { order: 'created_at', ascending: false });
+    setLoading(true); setError(null);
+    const { rows, count, error } = await fetchAllRows(TABLE, { order: 'rank', ascending: true });
     if (error) setError(error.message);
     setRows(rows);
     setTotalCount(count);
     setLoading(false);
   }
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab]);
+  useEffect(() => { load(); }, []);
 
-  // Tier counts — Mega 10M+, Macro 1M-10M, Mid 100K-1M, Micro <100K
   const tierCounts = useMemo(() => {
-    const c = { Mega: 0, Macro: 0, Mid: 0, Micro: 0 };
-    for (const r of rows) {
-      const total = totalFollowers(r);
-      const tier = tierFor(total);
-      c[tier]++;
-    }
+    const c = { Mega: 0, Macro: 0, Mid: 0, Micro: 0, Nano: 0, Other: 0 };
+    for (const r of rows) c[tierKey(r.tier)]++;
     return c;
+  }, [rows]);
+
+  const categories = useMemo(() => {
+    const set = new Set();
+    for (const r of rows) {
+      const v = (r.category || '').trim();
+      if (v) set.add(v);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((r) => {
-      if (statusFilter !== 'all' && (r.status || 'active') !== statusFilter) return false;
-      if (tierFilter !== 'all' && tierFor(totalFollowers(r)) !== tierFilter) return false;
+      if (tierFilter !== 'all' && tierKey(r.tier) !== tierFilter) return false;
+      if (categoryFilter !== 'all' && (r.category || '') !== categoryFilter) return false;
       if (!q) return true;
-      const hay = [
-        r.name, r.country, r.city, r.niche, r.category, r.languages,
-        r.instagram, r.tiktok, r.youtube, r.x_twitter, r.snapchat,
-        r.email, r.phone, r.whatsapp, r.manager_name,
-      ].filter(Boolean).join(' ').toLowerCase();
+      const hay = [r.name, r.ig_handle, r.category, r.city, r.nationality, r.tier]
+        .filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     });
-  }, [rows, query, statusFilter, tierFilter]);
+  }, [rows, query, tierFilter, categoryFilter]);
+
+  function strip(row) {
+    const { id, created_at, updated_at, ...rest } = row;
+    return rest;
+  }
+
+  async function commitInline(row, key, raw, isNumber) {
+    const before = { ...row };
+    const v = raw === '' || raw == null
+      ? null
+      : (isNumber ? (Number.isFinite(Number(raw)) ? Number(raw) : null) : raw);
+    if ((before[key] ?? null) === (v ?? null)) return;
+    setRows((xs) => xs.map((r) => r.id === row.id ? { ...r, [key]: v } : r));
+    const { error } = await supabase.from(TABLE).update({ [key]: v }).eq('id', row.id);
+    if (error) {
+      setError(error.message);
+      setRows((xs) => xs.map((r) => r.id === row.id ? before : r));
+      return;
+    }
+    undo.show('Updated influencer.', async () => {
+      await supabase.from(TABLE).update({ [key]: before[key] }).eq('id', row.id);
+      setRows((xs) => xs.map((r) => r.id === row.id ? before : r));
+    });
+  }
+
+  async function saveRow(form) {
+    const numericKeys = ['rank', 'ig_followers', 'tiktok_followers', 'youtube_subscribers', 'total_reach', 'engagement', 'est_rate'];
+    const payload = {};
+    for (const [k, raw] of Object.entries(form)) {
+      if (raw === '' || raw == null) { payload[k] = null; continue; }
+      if (numericKeys.includes(k)) {
+        const n = Number(raw);
+        payload[k] = Number.isFinite(n) ? n : null;
+      } else {
+        payload[k] = raw;
+      }
+    }
+    const isNew = !editing.id;
+    if (isNew) {
+      const { data, error } = await supabase.from(TABLE).insert(payload).select().single();
+      if (error) { setError(error.message); return; }
+      setEditing(null);
+      setRows((xs) => [data, ...xs]);
+      setTotalCount((c) => c + 1);
+      undo.show('Created influencer.', async () => {
+        await supabase.from(TABLE).delete().eq('id', data.id);
+        setRows((xs) => xs.filter((r) => r.id !== data.id));
+        setTotalCount((c) => c - 1);
+      });
+    } else {
+      const before = { ...editing };
+      const { data, error } = await supabase.from(TABLE).update(payload).eq('id', editing.id).select().single();
+      if (error) { setError(error.message); return; }
+      setEditing(null);
+      setRows((xs) => xs.map((r) => r.id === before.id ? data : r));
+      undo.show('Updated influencer.', async () => {
+        await supabase.from(TABLE).update(strip(before)).eq('id', before.id);
+        setRows((xs) => xs.map((r) => r.id === before.id ? before : r));
+      });
+    }
+  }
+
+  async function deleteRow(row) {
+    if (!confirm(`Delete ${row.name || 'this influencer'}? 5 seconds to undo.`)) return;
+    setRows((xs) => xs.filter((r) => r.id !== row.id));
+    setTotalCount((c) => c - 1);
+    setEditing(null);
+    const { error } = await supabase.from(TABLE).delete().eq('id', row.id);
+    if (error) { setError(error.message); load(); return; }
+    undo.show('Deleted influencer.', async () => {
+      const { data } = await supabase.from(TABLE).insert({ id: row.id, ...strip(row) }).select().single();
+      if (data) {
+        setRows((xs) => [data, ...xs]);
+        setTotalCount((c) => c + 1);
+      }
+    });
+  }
 
   return (
     <div style={{ padding: '28px 36px 60px', color: theme.text }}>
@@ -104,255 +167,241 @@ export default function Influencers() {
           </div>
           <h1 style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: theme.gold }}>Influencers</h1>
         </div>
-        <button
-          onClick={() => setEditing({ ...EMPTY })}
-          style={primaryBtn}
-        >
-          + Add influencer
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginTop: 22, borderBottom: `1px solid ${theme.border}` }}>
-        {TABS.map((t) => {
-          const active = t.key === tab;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: active ? theme.gold : theme.textDim,
-                padding: '10px 14px',
-                fontSize: 13,
-                fontWeight: active ? 700 : 500,
-                cursor: 'pointer',
-                borderBottom: active ? `2px solid ${theme.gold}` : '2px solid transparent',
-                marginBottom: -1,
-              }}
-            >
-              {t.label}
-            </button>
-          );
-        })}
+        <button onClick={() => setEditing({ ...EMPTY })} style={primaryBtn}>+ Add influencer</button>
       </div>
 
       {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginTop: 18 }}>
         <KPIBox label="Total influencers" value={totalCount} loading={loading} />
-        <KPIBox label="Mega (10M+)"     value={tierCounts.Mega}  loading={loading} color="#A78BFA" />
-        <KPIBox label="Macro (1M-10M)"  value={tierCounts.Macro} loading={loading} color={theme.blue} />
-        <KPIBox label="Mid (100K-1M)"   value={tierCounts.Mid}   loading={loading} color={theme.gold} />
-        <KPIBox label="Micro (<100K)"   value={tierCounts.Micro} loading={loading} color={theme.green} />
+        <KPIBox label="Mega (10M+)"      value={tierCounts.Mega}  loading={loading} color={TIER_COLORS.Mega} />
+        <KPIBox label="Macro (1M-10M)"   value={tierCounts.Macro} loading={loading} color={TIER_COLORS.Macro} />
+        <KPIBox label="Mid (100K-1M)"    value={tierCounts.Mid}   loading={loading} color={TIER_COLORS.Mid} />
+        <KPIBox label="Micro (10K-100K)" value={tierCounts.Micro} loading={loading} color={TIER_COLORS.Micro} />
+        <KPIBox label="Nano (<10K)"      value={tierCounts.Nano}  loading={loading} color={TIER_COLORS.Nano} />
+        <KPIBox label="Other / unset"    value={tierCounts.Other} loading={loading} color={TIER_COLORS.Other} />
       </div>
 
       {/* Tier filter chips */}
-      <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-        {['all', ...TIER_OPTIONS].map((t) => (
-          <button
-            key={t}
-            onClick={() => setTierFilter(t)}
-            style={{
-              background: t === tierFilter ? theme.goldTint : 'transparent',
-              color: t === tierFilter ? theme.gold : theme.textDim,
-              border: `1px solid ${t === tierFilter ? theme.gold : theme.border}`,
-              borderRadius: 999, padding: '4px 12px',
-              fontSize: 12, fontWeight: 600,
-              cursor: 'pointer',
-              textTransform: 'capitalize',
-            }}
-          >
+      <div style={{ display: 'flex', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+        {['all', ...TIER_OPTIONS, 'Other'].map((t) => (
+          <Chip key={t} active={tierFilter === t} onClick={() => setTierFilter(t)}>
             {t === 'all' ? 'All tiers' : t}
-          </button>
+          </Chip>
         ))}
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '16px 0 12px', flexWrap: 'wrap' }}>
+      {/* Category filter chips (capped, plus an "All" + dropdown overflow) */}
+      <CategoryChips
+        categories={categories}
+        active={categoryFilter}
+        onChange={setCategoryFilter}
+      />
+
+      {/* Search bar + status */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '14px 0 12px', flexWrap: 'wrap' }}>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search name, handle, niche, country…"
+          placeholder="Search name, handle, niche, city, nationality…"
           style={{ ...inputStyle, flex: 1, minWidth: 240 }}
         />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ ...inputStyle, width: 150 }}
-        >
-          <option value="all">All statuses</option>
-          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <div style={{ color: theme.textMuted, fontSize: 12, marginLeft: 'auto' }}>
-          {loading ? 'loading…' : `${fmtNumber(filtered.length)} match · ${fmtNumber(totalCount)} total${rows.length < totalCount ? ` (loaded ${fmtNumber(rows.length)})` : ''}`}
+        <div style={{ color: theme.textMuted, fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          {loading && <LoadingSpinner size={12} />}
+          {loading
+            ? 'loading…'
+            : `${fmtNumber(filtered.length)} match · ${fmtNumber(totalCount)} total${rows.length < totalCount ? ` (loaded ${fmtNumber(rows.length)})` : ''}`}
         </div>
       </div>
 
       {error && (
-        <div style={{ padding: 12, background: 'rgba(239,68,68,0.08)', border: `1px solid ${theme.red}`, borderRadius: 8, color: theme.red, marginBottom: 12, fontSize: 13 }}>
-          {error}
-        </div>
+        <div style={errorBox}>{error}</div>
       )}
 
       {/* Table */}
       <div style={{ border: `1px solid ${theme.border}`, borderRadius: 10, overflow: 'hidden', background: theme.bg2 }}>
         <div style={tableHeader}>
+          <div style={{ flex: 0.5, textAlign: 'right' }}>Rank</div>
           <div style={{ flex: 2 }}>Name</div>
-          <div style={{ flex: 1.2 }}>Location</div>
-          <div style={{ flex: 1.4 }}>Primary</div>
-          <div style={{ flex: 1, textAlign: 'right' }}>Total reach</div>
-          <div style={{ flex: 1.2 }}>Niche</div>
-          <div style={{ flex: 0.9, textAlign: 'right' }}>Rate (AED)</div>
-          <div style={{ flex: 0.8 }}>Status</div>
+          <div style={{ flex: 0.7 }}>Tier</div>
+          <div style={{ flex: 1.2 }}>Category</div>
+          <div style={{ flex: 1 }}>Location</div>
+          <div style={{ flex: 0.9, textAlign: 'right' }}>Total reach</div>
+          <div style={{ flex: 0.7, textAlign: 'right' }}>Engagement</div>
+          <div style={{ flex: 0.8, textAlign: 'right' }}>Est. rate</div>
         </div>
-        {!loading && filtered.length === 0 && (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: theme.textMuted, fontSize: 13 }}>
-            {rows.length === 0 ? 'No influencers yet. Click "+ Add influencer" to add the first one.' : 'No matches.'}
+        {loading && (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: theme.textMuted, fontSize: 13, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+            <LoadingSpinner /> Loading…
           </div>
         )}
-        {filtered.map((r) => (
-          <div
-            key={r.id}
-            onClick={() => setEditing(r)}
-            style={tableRow}
-            onMouseEnter={(e) => (e.currentTarget.style.background = theme.bgHover)}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          >
-            <div style={{ flex: 2, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {r.name || <span style={{ color: theme.textMuted }}>(no name)</span>}
-              </div>
-              <div style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>
-                {[r.instagram && `@${r.instagram}`, r.tiktok && `tt:${r.tiktok}`].filter(Boolean).join(' · ')}
-              </div>
-            </div>
-            <div style={{ flex: 1.2, color: theme.textDim, fontSize: 13 }}>
-              {[r.city, r.country].filter(Boolean).join(', ') || '—'}
-            </div>
-            <div style={{ flex: 1.4, color: theme.textDim, fontSize: 13 }}>
-              {r.primary_platform || '—'}
-            </div>
-            <div style={{ flex: 1, textAlign: 'right', color: theme.text, fontVariantNumeric: 'tabular-nums' }}>
-              {fmtFollowers(totalFollowers(r)) || '—'}
-            </div>
-            <div style={{ flex: 1.2, color: theme.textDim, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {r.niche || '—'}
-            </div>
-            <div style={{ flex: 0.9, textAlign: 'right', color: theme.text, fontVariantNumeric: 'tabular-nums' }}>
-              {r.rate_aed != null && r.rate_aed !== '' ? fmtCompact(r.rate_aed) : '—'}
-            </div>
-            <div style={{ flex: 0.8 }}>
-              <StatusPill value={r.status} />
-            </div>
+        {!loading && filtered.length === 0 && (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: theme.textMuted, fontSize: 13 }}>
+            {rows.length === 0 ? 'No influencers yet.' : 'No matches.'}
           </div>
+        )}
+        {!loading && filtered.map((r) => (
+          <RowView key={r.id} row={r} onOpen={() => setEditing(r)} onInlineCommit={commitInline} />
         ))}
       </div>
 
       {editing && (
         <EditDrawer
           row={editing}
-          table={tab}
+          categories={categories}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); }}
-          onDeleted={() => { setEditing(null); load(); }}
+          onSave={saveRow}
+          onDelete={editing.id ? () => deleteRow(editing) : null}
         />
+      )}
+
+      <Toast toast={undo.toast} onUndo={undo.runUndo} onDismiss={undo.dismiss} />
+    </div>
+  );
+}
+
+function CategoryChips({ categories, active, onChange }) {
+  const VISIBLE = 10;
+  const visible = categories.slice(0, VISIBLE);
+  const overflow = categories.slice(VISIBLE);
+  return (
+    <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      <Chip active={active === 'all'} onClick={() => onChange('all')}>All categories</Chip>
+      {visible.map((c) => (
+        <Chip key={c} active={active === c} onClick={() => onChange(c)}>{c}</Chip>
+      ))}
+      {overflow.length > 0 && (
+        <select
+          value={overflow.includes(active) ? active : ''}
+          onChange={(e) => e.target.value && onChange(e.target.value)}
+          style={{
+            background: theme.bg3, color: theme.textDim,
+            border: `1px solid ${theme.border}`, borderRadius: 999,
+            padding: '4px 8px', fontSize: 12, cursor: 'pointer', outline: 'none',
+          }}
+        >
+          <option value="">More categories…</option>
+          {overflow.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
       )}
     </div>
   );
 }
 
-function StatusPill({ value }) {
-  const v = value || 'active';
-  const color = v === 'active' ? theme.green : v === 'paused' ? theme.amber : theme.red;
+function Chip({ active, onClick, children }) {
   return (
-    <span style={{
-      display: 'inline-block',
-      padding: '2px 8px',
-      borderRadius: 999,
-      fontSize: 11,
-      fontWeight: 600,
-      color,
-      background: `${color}22`,
-      border: `1px solid ${color}55`,
-      textTransform: 'capitalize',
-    }}>
-      {v}
-    </span>
+    <button onClick={onClick} style={{
+      background: active ? theme.goldTint : 'transparent',
+      color: active ? theme.gold : theme.textDim,
+      border: `1px solid ${active ? theme.gold : theme.border}`,
+      borderRadius: 999, padding: '4px 12px',
+      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+      whiteSpace: 'nowrap',
+    }}>{children}</button>
   );
 }
 
-function EditDrawer({ row, table, onClose, onSaved, onDeleted }) {
+function RowView({ row, onOpen, onInlineCommit }) {
+  const tier = tierKey(row.tier);
+  const tColor = TIER_COLORS[tier];
+  return (
+    <div onClick={onOpen} style={tableRow}
+         onMouseEnter={(e) => (e.currentTarget.style.background = theme.bgHover)}
+         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+      <div style={{ flex: 0.5, textAlign: 'right', color: theme.textMuted, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+        {row.rank == null || row.rank === '' ? '—' : row.rank}
+      </div>
+      <div style={{ flex: 2, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {row.name || <span style={{ color: theme.textMuted }}>(no name)</span>}
+        </div>
+        <div style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>
+          {row.ig_handle ? `@${row.ig_handle}` : ''}
+          {row.ig_followers ? `${row.ig_handle ? ' · ' : ''}IG ${fmtCompact(row.ig_followers)}` : ''}
+        </div>
+      </div>
+      <div style={{ flex: 0.7 }}>
+        <span style={{
+          display: 'inline-block', padding: '2px 8px', borderRadius: 999,
+          fontSize: 11, fontWeight: 600, color: tColor,
+          background: `${tColor}22`, border: `1px solid ${tColor}55`,
+        }}>{tier}</span>
+      </div>
+      <div style={{ flex: 1.2, color: theme.textDim, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {row.category || '—'}
+      </div>
+      <div style={{ flex: 1, color: theme.textDim, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {[row.city, row.nationality].filter(Boolean).join(' / ') || '—'}
+      </div>
+      <InlineNumberCell flex={0.9} value={row.total_reach} onCommit={(v) => onInlineCommit(row, 'total_reach', v, true)} />
+      <InlineNumberCell flex={0.7} value={row.engagement}  onCommit={(v) => onInlineCommit(row, 'engagement', v, true)} suffix="%" />
+      <InlineNumberCell flex={0.8} value={row.est_rate}    onCommit={(v) => onInlineCommit(row, 'est_rate', v, true)} />
+    </div>
+  );
+}
+
+function InlineNumberCell({ value, onCommit, flex, suffix }) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value == null ? '' : String(value));
+  useEffect(() => { setV(value == null ? '' : String(value)); }, [value]);
+
+  function commit() {
+    setEditing(false);
+    if ((value ?? null) === (v === '' ? null : Number(v))) return;
+    onCommit(v);
+  }
+
+  if (!editing) {
+    const display = value == null || value === '' ? '—' : fmtCompact(value);
+    return (
+      <div
+        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+        title="Click to edit"
+        style={{
+          flex, textAlign: 'right',
+          color: theme.text, fontSize: 13,
+          fontVariantNumeric: 'tabular-nums',
+          padding: '2px 6px', margin: '-2px -6px',
+          borderRadius: 4, border: '1px dashed transparent', cursor: 'text',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.border; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
+      >
+        {display}{suffix && display !== '—' ? suffix : ''}
+      </div>
+    );
+  }
+  return (
+    <input
+      autoFocus
+      type="number"
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') { setV(value == null ? '' : String(value)); setEditing(false); }
+      }}
+      style={{
+        flex, textAlign: 'right',
+        background: theme.bg3, color: theme.text,
+        border: `1px solid ${theme.gold}`, borderRadius: 4,
+        padding: '4px 6px', fontSize: 13, outline: 'none', fontFamily: 'inherit',
+        fontVariantNumeric: 'tabular-nums', minWidth: 0,
+      }}
+    />
+  );
+}
+
+function EditDrawer({ row, categories, onClose, onSave, onDelete }) {
   const isNew = !row.id;
   const [form, setForm] = useState(() => ({ ...EMPTY, ...row }));
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState(null);
-
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
-  async function save() {
-    setSaving(true);
-    setErr(null);
-
-    // Coerce numeric fields; empty string → null
-    const numericKeys = ['followers_instagram','followers_tiktok','followers_youtube','followers_x','followers_snapchat','rate_aed'];
-    const payload = {};
-    for (const [k, v] of Object.entries(form)) {
-      if (k === 'id' || k === 'created_at' || k === 'updated_at') continue;
-      if (numericKeys.includes(k)) {
-        payload[k] = v === '' || v == null ? null : Number(v);
-      } else {
-        payload[k] = v === '' ? null : v;
-      }
-    }
-
-    const q = isNew
-      ? supabase.from(table).insert(payload).select().single()
-      : supabase.from(table).update(payload).eq('id', row.id).select().single();
-    const { error } = await q;
-    setSaving(false);
-    if (error) { setErr(error.message); return; }
-    onSaved();
-  }
-
-  async function remove() {
-    if (!confirm(`Delete ${form.name || 'this influencer'}? This cannot be undone.`)) return;
-    setSaving(true);
-    const { error } = await supabase.from(table).delete().eq('id', row.id);
-    setSaving(false);
-    if (error) { setErr(error.message); return; }
-    onDeleted();
-  }
-
-  async function moveToOther() {
-    const target = table === 'influencers_comprehensive' ? 'influencers_focused' : 'influencers_comprehensive';
-    const verb = target === 'influencers_focused' ? 'Promote to Focused' : 'Move to Comprehensive';
-    if (!confirm(`${verb}? A copy will be inserted into the other tab.`)) return;
-    setSaving(true);
-    setErr(null);
-    const { id, created_at, updated_at, ...rest } = form;
-    const { error } = await supabase.from(target).insert(rest);
-    setSaving(false);
-    if (error) { setErr(error.message); return; }
-    onSaved();
-  }
-
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
-        display: 'flex', justifyContent: 'flex-end',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 560, maxWidth: '100%', height: '100%', background: theme.bg2,
-          borderLeft: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column',
-        }}
-      >
-        <div style={{ padding: '16px 22px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div onClick={onClose} style={overlayStyle}>
+      <div onClick={(e) => e.stopPropagation()} style={drawerStyle}>
+        <div style={drawerHeader}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, color: theme.textMuted, textTransform: 'uppercase' }}>
               {isNew ? 'New influencer' : 'Edit influencer'}
@@ -363,107 +412,48 @@ function EditDrawer({ row, table, onClose, onSaved, onDeleted }) {
           </div>
           <button onClick={onClose} style={ghostBtn}>Close</button>
         </div>
-
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px' }}>
           <Section title="Identity">
-            <Row><Field label="Name" value={form.name} onChange={(v) => set('name', v)} autoFocus /></Row>
             <Row>
-              <Field label="Country" value={form.country} onChange={(v) => set('country', v)} />
-              <Field label="City" value={form.city} onChange={(v) => set('city', v)} />
-            </Row>
-          </Section>
-
-          <Section title="Handles">
-            <Row>
-              <Field label="Instagram" value={form.instagram} onChange={(v) => set('instagram', v)} prefix="@" />
-              <Field label="TikTok" value={form.tiktok} onChange={(v) => set('tiktok', v)} prefix="@" />
+              <Field label="Rank"        value={form.rank}        onChange={(v) => set('rank', v)}        type="number" />
+              <Field label="Name"        value={form.name}        onChange={(v) => set('name', v)} />
             </Row>
             <Row>
-              <Field label="YouTube" value={form.youtube} onChange={(v) => set('youtube', v)} prefix="@" />
-              <Field label="X / Twitter" value={form.x_twitter} onChange={(v) => set('x_twitter', v)} prefix="@" />
+              <Field label="Instagram handle" value={form.ig_handle} onChange={(v) => set('ig_handle', v)} prefix="@" />
+              <Select label="Tier" value={form.tier || ''} onChange={(v) => set('tier', v)} options={['', ...TIER_OPTIONS]} />
             </Row>
             <Row>
-              <Field label="Snapchat" value={form.snapchat} onChange={(v) => set('snapchat', v)} prefix="@" />
-              <Select label="Primary platform" value={form.primary_platform} onChange={(v) => set('primary_platform', v)}
-                options={['', ...PLATFORMS]} />
-            </Row>
-          </Section>
-
-          <Section title="Reach (followers)">
-            <Row>
-              <Field label="Instagram" type="number" value={form.followers_instagram} onChange={(v) => set('followers_instagram', v)} />
-              <Field label="TikTok" type="number" value={form.followers_tiktok} onChange={(v) => set('followers_tiktok', v)} />
+              <Field label="Category"    value={form.category}    onChange={(v) => set('category', v)} list="cat-list" />
+              <datalist id="cat-list">
+                {categories.map((c) => <option key={c} value={c} />)}
+              </datalist>
+              <Field label="City"        value={form.city}        onChange={(v) => set('city', v)} />
             </Row>
             <Row>
-              <Field label="YouTube" type="number" value={form.followers_youtube} onChange={(v) => set('followers_youtube', v)} />
-              <Field label="X" type="number" value={form.followers_x} onChange={(v) => set('followers_x', v)} />
-            </Row>
-            <Row>
-              <Field label="Snapchat" type="number" value={form.followers_snapchat} onChange={(v) => set('followers_snapchat', v)} />
+              <Field label="Nationality" value={form.nationality} onChange={(v) => set('nationality', v)} />
               <div style={{ flex: 1 }} />
             </Row>
           </Section>
-
-          <Section title="Niche & language">
+          <Section title="Reach">
             <Row>
-              <Field label="Niche" value={form.niche} onChange={(v) => set('niche', v)} placeholder="fashion, beauty, food…" />
-              <Field label="Category" value={form.category} onChange={(v) => set('category', v)} placeholder="mega / macro / micro / nano" />
+              <Field label="IG followers"        value={form.ig_followers}        onChange={(v) => set('ig_followers', v)} type="number" />
+              <Field label="TikTok followers"    value={form.tiktok_followers}    onChange={(v) => set('tiktok_followers', v)} type="number" />
             </Row>
             <Row>
-              <Field label="Languages" value={form.languages} onChange={(v) => set('languages', v)} placeholder="EN, AR" />
-              <div style={{ flex: 1 }} />
-            </Row>
-          </Section>
-
-          <Section title="Commercials">
-            <Row>
-              <Field label="Rate (AED)" type="number" value={form.rate_aed} onChange={(v) => set('rate_aed', v)} />
-              <Field label="Payment terms" value={form.payment_terms} onChange={(v) => set('payment_terms', v)} placeholder="50% upfront, net 30…" />
+              <Field label="YouTube subscribers" value={form.youtube_subscribers} onChange={(v) => set('youtube_subscribers', v)} type="number" />
+              <Field label="Total reach"         value={form.total_reach}         onChange={(v) => set('total_reach', v)} type="number" />
             </Row>
             <Row>
-              <Field label="Currency notes" value={form.currency_notes} onChange={(v) => set('currency_notes', v)} />
+              <Field label="Engagement (%)"      value={form.engagement}          onChange={(v) => set('engagement', v)} type="number" />
+              <Field label="Est. rate (AED)"     value={form.est_rate}            onChange={(v) => set('est_rate', v)} type="number" />
             </Row>
           </Section>
-
-          <Section title="Status & contact">
-            <Row>
-              <Select label="Status" value={form.status || 'active'} onChange={(v) => set('status', v)} options={STATUS_OPTIONS} />
-              <Field label="Manager name" value={form.manager_name} onChange={(v) => set('manager_name', v)} />
-            </Row>
-            <Row>
-              <Field label="Email" value={form.email} onChange={(v) => set('email', v)} />
-              <Field label="Phone" value={form.phone} onChange={(v) => set('phone', v)} />
-            </Row>
-            <Row>
-              <Field label="WhatsApp" value={form.whatsapp} onChange={(v) => set('whatsapp', v)} />
-              <div style={{ flex: 1 }} />
-            </Row>
-            <Row>
-              <Field label="Notes" value={form.notes} onChange={(v) => set('notes', v)} multiline />
-            </Row>
-          </Section>
-
-          {err && (
-            <div style={{ padding: 12, background: 'rgba(239,68,68,0.08)', border: `1px solid ${theme.red}`, borderRadius: 8, color: theme.red, marginTop: 8, fontSize: 13 }}>
-              {err}
-            </div>
-          )}
         </div>
-
-        <div style={{ padding: '14px 22px', borderTop: `1px solid ${theme.border}`, display: 'flex', gap: 8, alignItems: 'center' }}>
-          {!isNew && (
-            <button onClick={remove} disabled={saving} style={dangerBtn}>Delete</button>
-          )}
-          {!isNew && (
-            <button onClick={moveToOther} disabled={saving} style={ghostBtn}>
-              {table === 'influencers_comprehensive' ? '→ Focused' : '→ Comprehensive'}
-            </button>
-          )}
+        <div style={drawerFooter}>
+          {onDelete && <button onClick={onDelete} style={dangerBtn}>Delete</button>}
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} disabled={saving} style={ghostBtn}>Cancel</button>
-          <button onClick={save} disabled={saving} style={primaryBtn}>
-            {saving ? 'Saving…' : (isNew ? 'Create' : 'Save')}
-          </button>
+          <button onClick={onClose} style={ghostBtn}>Cancel</button>
+          <button onClick={() => onSave(form)} style={primaryBtn}>{isNew ? 'Create' : 'Save'}</button>
         </div>
       </div>
     </div>
@@ -485,9 +475,9 @@ function Row({ children }) {
   return <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>{children}</div>;
 }
 
-function Field({ label, value, onChange, type = 'text', prefix, placeholder, multiline, autoFocus }) {
+function Field({ label, value, onChange, type = 'text', prefix, placeholder, list }) {
   return (
-    <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <span style={fieldLabel}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'stretch', background: theme.bg3, border: `1px solid ${theme.border}`, borderRadius: 6 }}>
         {prefix && (
@@ -495,24 +485,14 @@ function Field({ label, value, onChange, type = 'text', prefix, placeholder, mul
             {prefix}
           </span>
         )}
-        {multiline ? (
-          <textarea
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            rows={3}
-            style={{ ...bareInput, resize: 'vertical' }}
-          />
-        ) : (
-          <input
-            type={type}
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            autoFocus={autoFocus}
-            style={bareInput}
-          />
-        )}
+        <input
+          type={type}
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          list={list}
+          style={bareInput}
+        />
       </div>
     </label>
   );
@@ -520,7 +500,7 @@ function Field({ label, value, onChange, type = 'text', prefix, placeholder, mul
 
 function Select({ label, value, onChange, options }) {
   return (
-    <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <label style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
       <span style={fieldLabel}>{label}</span>
       <select value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={inputStyle}>
         {options.map((o) => <option key={o} value={o}>{o || '—'}</option>)}
@@ -529,88 +509,61 @@ function Select({ label, value, onChange, options }) {
   );
 }
 
-const fieldLabel = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: 1,
-  color: theme.textMuted,
-  textTransform: 'uppercase',
-};
-
+const fieldLabel = { fontSize: 10, fontWeight: 700, letterSpacing: 1, color: theme.textMuted, textTransform: 'uppercase' };
 const inputStyle = {
-  background: theme.bg3,
-  color: theme.text,
-  border: `1px solid ${theme.border}`,
-  borderRadius: 6,
-  padding: '8px 10px',
-  fontSize: 13,
-  outline: 'none',
-  fontFamily: 'inherit',
+  background: theme.bg3, color: theme.text,
+  border: `1px solid ${theme.border}`, borderRadius: 6,
+  padding: '8px 10px', fontSize: 13, outline: 'none', fontFamily: 'inherit',
 };
-
 const bareInput = {
-  flex: 1,
-  background: 'transparent',
-  color: theme.text,
-  border: 'none',
-  padding: '8px 10px',
-  fontSize: 13,
-  outline: 'none',
-  fontFamily: 'inherit',
-  width: '100%',
+  flex: 1, background: 'transparent', color: theme.text,
+  border: 'none', padding: '8px 10px', fontSize: 13, outline: 'none',
+  fontFamily: 'inherit', width: '100%',
 };
-
 const primaryBtn = {
-  background: theme.gold,
-  color: '#0A0E14',
-  border: 'none',
-  borderRadius: 6,
-  padding: '8px 14px',
-  fontSize: 13,
-  fontWeight: 700,
-  cursor: 'pointer',
+  background: theme.gold, color: '#0A0E14',
+  border: 'none', borderRadius: 6, padding: '8px 14px',
+  fontSize: 13, fontWeight: 700, cursor: 'pointer',
 };
-
 const ghostBtn = {
-  background: 'transparent',
-  color: theme.textDim,
-  border: `1px solid ${theme.border}`,
-  borderRadius: 6,
-  padding: '8px 12px',
-  fontSize: 13,
-  cursor: 'pointer',
+  background: 'transparent', color: theme.textDim,
+  border: `1px solid ${theme.border}`, borderRadius: 6,
+  padding: '8px 12px', fontSize: 13, cursor: 'pointer',
 };
-
 const dangerBtn = {
-  background: 'transparent',
-  color: theme.red,
-  border: `1px solid ${theme.red}55`,
-  borderRadius: 6,
-  padding: '8px 12px',
-  fontSize: 13,
-  cursor: 'pointer',
+  background: 'transparent', color: theme.red,
+  border: `1px solid ${theme.red}55`, borderRadius: 6,
+  padding: '8px 12px', fontSize: 13, cursor: 'pointer',
 };
-
 const tableHeader = {
-  display: 'flex',
-  gap: 14,
-  padding: '10px 16px',
-  background: theme.bg3,
-  borderBottom: `1px solid ${theme.border}`,
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: 1,
-  color: theme.textMuted,
-  textTransform: 'uppercase',
+  display: 'flex', gap: 14, padding: '10px 16px',
+  background: theme.bg3, borderBottom: `1px solid ${theme.border}`,
+  fontSize: 10, fontWeight: 700, letterSpacing: 1,
+  color: theme.textMuted, textTransform: 'uppercase',
 };
-
 const tableRow = {
-  display: 'flex',
-  gap: 14,
-  alignItems: 'center',
-  padding: '12px 16px',
-  borderBottom: `1px solid ${theme.border}`,
-  fontSize: 13,
-  cursor: 'pointer',
-  transition: 'background .1s',
+  display: 'flex', gap: 14, alignItems: 'center',
+  padding: '10px 16px', borderBottom: `1px solid ${theme.border}`,
+  fontSize: 13, cursor: 'pointer', transition: 'background .1s',
+};
+const overlayStyle = {
+  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
+  display: 'flex', justifyContent: 'flex-end',
+};
+const drawerStyle = {
+  width: 560, maxWidth: '100%', height: '100%', background: theme.bg2,
+  borderLeft: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column',
+};
+const drawerHeader = {
+  padding: '16px 22px', borderBottom: `1px solid ${theme.border}`,
+  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+};
+const drawerFooter = {
+  padding: '14px 22px', borderTop: `1px solid ${theme.border}`,
+  display: 'flex', gap: 8, alignItems: 'center',
+};
+const errorBox = {
+  padding: 12, background: 'rgba(239,68,68,0.08)',
+  border: `1px solid ${theme.red}`, borderRadius: 8, color: theme.red,
+  margin: '12px 0', fontSize: 13,
 };

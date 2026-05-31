@@ -8,7 +8,7 @@
 -- some of these migrations applied.
 --
 --   0001 — Round 1 init (18 base tables + updated_at trigger + RLS lockdown)
---   0002 — Influencers (comprehensive + focused) real columns
+--   0002 — Influencers (comprehensive + focused) real columns  [legacy]
 --   0003 — Clients
 --   0004 — Models
 --   0005 — Connections
@@ -647,7 +647,7 @@ create table if not exists public.objectives_tasks (
   day        text,
   week       text,
   done       boolean default false,
-  position   int,
+  position   int default 0,
   created_at timestamptz not null default now()
 );
 

@@ -7,7 +7,7 @@ create table if not exists public.objectives_tasks (
   day        text,
   week       text,
   done       boolean default false,
-  position   int,
+  position   int default 0,
   created_at timestamptz not null default now()
 );
 

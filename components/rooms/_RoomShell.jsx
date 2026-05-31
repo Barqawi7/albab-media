@@ -527,8 +527,10 @@ export const fmtNumber = (v) => {
   return Number.isFinite(n) ? n.toLocaleString() : String(v);
 };
 
-// Compact human-friendly numbers: 999 → "999", 1500 → "1.5K", 1000 → "1K",
-// 2345 → "2.3K", 1_000_000 → "1M", 57_500_000 → "57.5M".
+// ONE shared compact-number helper used everywhere in the app.
+//   n < 1000              → raw integer ("999")
+//   1000 ≤ n < 1,000,000  → "X.XK" with one decimal, trailing .0 trimmed ("1K", "2.3K", "999K")
+//   n ≥ 1,000,000         → "X.XM" with one decimal, trailing .0 trimmed ("1M", "2.3M", "57.5M", "1500M")
 export const fmtCompact = (v) => {
   if (v == null || v === '') return '—';
   const n = Number(v);
@@ -537,9 +539,8 @@ export const fmtCompact = (v) => {
   const abs = Math.abs(n);
   if (abs < 1000) return sign + Math.round(abs).toString();
   let value, suffix;
-  if (abs < 1_000_000)         { value = abs / 1_000;         suffix = 'K'; }
-  else if (abs < 1_000_000_000) { value = abs / 1_000_000;    suffix = 'M'; }
-  else                          { value = abs / 1_000_000_000; suffix = 'B'; }
+  if (abs < 1_000_000) { value = abs / 1_000;     suffix = 'K'; }
+  else                 { value = abs / 1_000_000; suffix = 'M'; }
   const rounded = Math.round(value * 10) / 10;
   const str = rounded % 1 === 0 ? String(Math.round(rounded)) : rounded.toFixed(1);
   return sign + str + suffix;

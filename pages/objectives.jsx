@@ -90,16 +90,20 @@ function ObjectivesView() {
     return rest;
   }
 
-  async function addTask(week, day) {
-    const title = prompt('Task title:');
-    if (!title || !title.trim()) return;
-    const payload = { title: title.trim(), week: week || null, day: day || null, done: false };
+  async function addTask(week, day, title) {
+    const t = (title ?? prompt('Task title:'))?.trim();
+    if (!t) return;
+    const cellTasks = tasks.filter((x) => (x.week || null) === (week || null) && (x.day || null) === (day || null));
+    const nextPos = cellTasks.length === 0
+      ? 0
+      : Math.max(...cellTasks.map((x) => Number.isFinite(Number(x.position)) ? Number(x.position) : 0)) + 1;
+    const payload = { title: t, week: week || null, day: day || null, done: false, position: nextPos };
     const { data, error } = await supabase.from('objectives_tasks').insert(payload).select().single();
     if (error) { setError(error.message); return; }
     setTasks((xs) => [...xs, data]);
     undo.show('Added task.', async () => {
       await supabase.from('objectives_tasks').delete().eq('id', data.id);
-      setTasks((xs) => xs.filter((t) => t.id !== data.id));
+      setTasks((xs) => xs.filter((x) => x.id !== data.id));
     });
   }
 
@@ -108,18 +112,26 @@ function ObjectivesView() {
     const newDay  = day || null;
     if ((task.week || null) === newWeek && (task.day || null) === newDay) return;
     const before = { ...task };
-    setTasks((xs) => xs.map((t) => t.id === task.id ? { ...t, week: newWeek, day: newDay } : t));
-    const { error } = await supabase
-      .from('objectives_tasks')
-      .update({ week: newWeek, day: newDay })
-      .eq('id', task.id);
+    // New position = max(position) + 1 inside the target cell.
+    const sameCell = tasks.filter((t) =>
+      (t.week || null) === newWeek && (t.day || null) === newDay && t.id !== task.id
+    );
+    const nextPos = sameCell.length === 0
+      ? 0
+      : Math.max(...sameCell.map((t) => Number.isFinite(Number(t.position)) ? Number(t.position) : 0)) + 1;
+    const patch = { week: newWeek, day: newDay, position: nextPos };
+
+    setTasks((xs) => xs.map((t) => t.id === task.id ? { ...t, ...patch } : t));
+    const { error } = await supabase.from('objectives_tasks').update(patch).eq('id', task.id);
     if (error) {
       setError(error.message);
       setTasks((xs) => xs.map((t) => t.id === task.id ? before : t));
       return;
     }
     undo.show('Moved task.', async () => {
-      await supabase.from('objectives_tasks').update({ week: before.week, day: before.day }).eq('id', task.id);
+      await supabase.from('objectives_tasks')
+        .update({ week: before.week, day: before.day, position: before.position ?? 0 })
+        .eq('id', task.id);
       setTasks((xs) => xs.map((t) => t.id === task.id ? before : t));
     });
   }
@@ -191,7 +203,7 @@ function ObjectivesView() {
 
       <BacklogRow
         tasks={byCell.get(`|`) || []}
-        onAdd={() => addTask(null, null)}
+        onAdd={(title) => addTask(null, null, title)}
         onDrop={(t) => moveTask(t, null, null)}
         onUpdateTask={updateTask}
         onDeleteTask={deleteTask}
@@ -203,7 +215,7 @@ function ObjectivesView() {
           week={week}
           isCurrent={week === NOW_WEEK}
           byCell={byCell}
-          onAdd={(day) => addTask(week, day)}
+          onAdd={(day, title) => addTask(week, day, title)}
           onDrop={(t, day) => moveTask(t, week, day)}
           onUpdateTask={updateTask}
           onDeleteTask={deleteTask}
@@ -217,6 +229,11 @@ function ObjectivesView() {
 
 function BacklogRow({ tasks, onAdd, onDrop, onUpdateTask, onDeleteTask }) {
   const [over, setOver] = useState(false);
+  const [draft, setDraft] = useState('');
+  function submit() {
+    if (draft.trim()) onAdd(draft);
+    setDraft('');
+  }
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
@@ -237,7 +254,21 @@ function BacklogRow({ tasks, onAdd, onDrop, onUpdateTask, onDeleteTask }) {
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: theme.textMuted, textTransform: 'uppercase' }}>
           Backlog (no week)
         </div>
-        <button onClick={onAdd} style={smallBtn}>+ Add</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+            placeholder="Add a backlog task…"
+            style={{
+              background: theme.bg3, color: theme.text,
+              border: `1px solid ${theme.border}`, borderRadius: 6,
+              padding: '4px 10px', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+              minWidth: 220,
+            }}
+          />
+          <button onClick={submit} disabled={!draft.trim()} style={smallBtn}>+ Add</button>
+        </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 40 }}>
         {tasks.length === 0 && <div style={{ color: theme.textMuted, fontSize: 12 }}>Drag tasks here to defer.</div>}
@@ -267,7 +298,7 @@ function WeekRow({ week, isCurrent, byCell, onAdd, onDrop, onUpdateTask, onDelet
         <DayCell
           label="Week"
           tasks={weekBucket}
-          onAdd={() => onAdd(null)}
+          onAdd={(title) => onAdd(null, title)}
           onDrop={(t) => onDrop(t, null)}
           onUpdateTask={onUpdateTask}
           onDeleteTask={onDeleteTask}
@@ -280,7 +311,7 @@ function WeekRow({ week, isCurrent, byCell, onAdd, onDrop, onUpdateTask, onDelet
               key={day}
               label={day}
               tasks={cellTasks}
-              onAdd={() => onAdd(day)}
+              onAdd={(title) => onAdd(day, title)}
               onDrop={(t) => onDrop(t, day)}
               onUpdateTask={onUpdateTask}
               onDeleteTask={onDeleteTask}
@@ -294,6 +325,8 @@ function WeekRow({ week, isCurrent, byCell, onAdd, onDrop, onUpdateTask, onDelet
 
 function DayCell({ label, tasks, onAdd, onDrop, onUpdateTask, onDeleteTask, accent }) {
   const [over, setOver] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
@@ -316,7 +349,7 @@ function DayCell({ label, tasks, onAdd, onDrop, onUpdateTask, onDeleteTask, acce
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: accent ? theme.gold : theme.textMuted, textTransform: 'uppercase' }}>
           {label}
         </div>
-        <button onClick={onAdd} title="Add task" style={{
+        <button onClick={() => setAdding((v) => !v)} title="Add task" style={{
           background: 'transparent', color: theme.textMuted, border: 'none',
           fontSize: 16, lineHeight: 1, padding: '0 4px', cursor: 'pointer',
         }}>+</button>
@@ -325,6 +358,31 @@ function DayCell({ label, tasks, onAdd, onDrop, onUpdateTask, onDeleteTask, acce
         {tasks.map((t) => (
           <TaskCard key={t.id} task={t} onUpdate={onUpdateTask} onDelete={onDeleteTask} />
         ))}
+        {adding && (
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="New task… Enter to add, Esc to cancel"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && draft.trim()) {
+                onAdd(draft);
+                setDraft('');
+                setAdding(false);
+              }
+              if (e.key === 'Escape') { setDraft(''); setAdding(false); }
+            }}
+            onBlur={() => {
+              if (draft.trim()) { onAdd(draft); setDraft(''); }
+              setAdding(false);
+            }}
+            style={{
+              background: theme.bg2, color: theme.text,
+              border: `1px solid ${theme.gold}`, borderRadius: 6,
+              padding: '6px 8px', fontSize: 12, outline: 'none', fontFamily: 'inherit',
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import { fetchAllRows } from '../../lib/fetchAll';
 
 const TILES = [
   { slug: 'real-estate',  table: 'real_estate',                label: 'Properties' },
-  { slug: 'influencers',  table: 'influencers_comprehensive',  label: 'Influencers' },
+  { slug: 'influencers',  table: 'influencers_master',         label: 'Influencers' },
   { slug: 'invoices',     table: 'invoices',                   label: 'Invoices' },
   { slug: 'quotations',   table: 'quotations',                 label: 'Quotations' },
   { slug: 'expenses',     table: 'expenses',                   label: 'Expenses' },
