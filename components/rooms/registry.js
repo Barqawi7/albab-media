@@ -22,6 +22,7 @@ import Invoices from './Invoices';
 import Quotations from './Quotations';
 import Expenses from './Expenses';
 import CashFlow from './CashFlow';
+import RealEstate from './RealEstate';
 
 export const GROUPS = [
   {
@@ -33,10 +34,11 @@ export const GROUPS = [
   {
     label: 'Business',
     rooms: [
-      { slug: 'cash-flow',  label: 'Cash Flow',  component: CashFlow },
-      { slug: 'invoices',   label: 'Invoices',   component: Invoices },
-      { slug: 'quotations', label: 'Quotations', component: Quotations },
-      { slug: 'expenses',   label: 'Expenses',   component: Expenses },
+      { slug: 'cash-flow',   label: 'Cash Flow',   component: CashFlow },
+      { slug: 'invoices',    label: 'Invoices',    component: Invoices },
+      { slug: 'quotations',  label: 'Quotations',  component: Quotations },
+      { slug: 'expenses',    label: 'Expenses',    component: Expenses },
+      { slug: 'real-estate', label: 'Real Estate', component: RealEstate },
       { slug: 'sales',      label: 'Sales',      component: Sales },
       { slug: 'finance',    label: 'Finance',    component: Finance },
       { slug: 'clients',    label: 'Clients',    component: Clients },

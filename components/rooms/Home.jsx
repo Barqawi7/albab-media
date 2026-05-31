@@ -2,31 +2,38 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
-import { fmtCompact } from './_RoomShell';
+import { fmtCompact, KPIBox } from './_RoomShell';
+import { fetchAllRows } from '../../lib/fetchAll';
 
 const TILES = [
-  { slug: 'influencers',  table: 'influencers_comprehensive', label: 'Influencers' },
-  { slug: 'models',       table: 'models',                    label: 'Models' },
-  { slug: 'clients',      table: 'clients',                   label: 'Clients' },
-  { slug: 'connections',  table: 'connections',               label: 'Connections' },
-  { slug: 'sales',        table: 'sales_deals',               label: 'Sales deals' },
-  { slug: 'finance',      table: 'finance_money',             label: 'Income entries' },
-  { slug: 'finance',      table: 'finance_expenses',          label: 'Expenses' },
-  { slug: 'content',      table: 'content',                   label: 'Content' },
-  { slug: 'marketing',    table: 'marketing_updates',         label: 'Campaigns' },
-  { slug: 'events',       table: 'events',                    label: 'Events' },
-  { slug: 'tasks',        table: 'tasks',                     label: 'Tasks' },
-  { slug: 'ideas',        table: 'ideas',                     label: 'Ideas' },
+  { slug: 'real-estate',  table: 'real_estate',                label: 'Properties' },
+  { slug: 'influencers',  table: 'influencers_comprehensive',  label: 'Influencers' },
+  { slug: 'invoices',     table: 'invoices',                   label: 'Invoices' },
+  { slug: 'quotations',   table: 'quotations',                 label: 'Quotations' },
+  { slug: 'expenses',     table: 'expenses',                   label: 'Expenses' },
+  { slug: 'models',       table: 'models',                     label: 'Models' },
+  { slug: 'clients',      table: 'clients',                    label: 'Clients' },
+  { slug: 'connections',  table: 'connections',                label: 'Connections' },
+  { slug: 'sales',        table: 'sales_deals',                label: 'Sales deals' },
+  { slug: 'content',      table: 'content',                    label: 'Content' },
+  { slug: 'marketing',    table: 'marketing_updates',          label: 'Campaigns' },
+  { slug: 'events',       table: 'events',                     label: 'Events' },
+  { slug: 'tasks',        table: 'tasks',                      label: 'Tasks' },
+  { slug: 'ideas',        table: 'ideas',                      label: 'Ideas' },
 ];
+
+const QUOTATION_STATUSES = ['awarded', 'dropped', 'lost', 'pending'];
 
 export default function Home() {
   const [counts, setCounts] = useState({});
-  const [recents, setRecents] = useState({ tasks: [], deals: [], content: [] });
-  const [moneyTotals, setMoneyTotals] = useState({ income: 0, expenses: 0 });
+  const [recents, setRecents] = useState({ tasks: [], invoices: [] });
+  const [finance, setFinance] = useState({ cash: 0, expenses: 0, pending: 0, collected: 0, revenue: 0 });
+  const [quotationCounts, setQuotationCounts] = useState({ awarded: 0, dropped: 0, lost: 0, pending: 0, total: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
+      // Per-tile real counts via head: true
       const countResults = await Promise.all(
         TILES.map((t) => supabase.from(t.table).select('id', { count: 'exact', head: true }))
       );
@@ -34,26 +41,47 @@ export default function Home() {
       TILES.forEach((t, i) => { map[t.table] = countResults[i].count ?? 0; });
       setCounts(map);
 
-      const [tasksR, dealsR, contentR, incomeR, expensesR] = await Promise.all([
+      // Recents (small lists)
+      const [tasksR, invR] = await Promise.all([
         supabase.from('tasks').select('id,title,status,due_date').neq('status', 'done').order('created_at', { ascending: false }).limit(5),
-        supabase.from('sales_deals').select('id,deal_name,client,stage,value_aed').neq('stage', 'won').neq('stage', 'lost').order('created_at', { ascending: false }).limit(5),
-        supabase.from('content').select('id,title,platform,status,publish_date').order('created_at', { ascending: false }).limit(5),
-        supabase.from('finance_money').select('amount_aed,status').eq('status', 'received'),
-        supabase.from('finance_expenses').select('amount_aed'),
+        supabase.from('invoices').select('id,client,invoice_number,revenue,amount_paid,due_payment').order('created_at', { ascending: false }).limit(5),
       ]);
       setRecents({
-        tasks:   tasksR.data   || [],
-        deals:   dealsR.data   || [],
-        content: contentR.data || [],
+        tasks:    tasksR.data || [],
+        invoices: invR.data   || [],
       });
+
+      // Finance totals (sum across the relevant tables)
+      const [cashR, expR, invAllR, quoAllR] = await Promise.all([
+        fetchAllRows('cash_accounts', { select: 'balance' }),
+        fetchAllRows('expenses',      { select: 'amount' }),
+        fetchAllRows('invoices',      { select: 'revenue,amount_paid,due_payment' }),
+        fetchAllRows('quotations',    { select: 'status' }),
+      ]);
       const sum = (arr, k) => (arr || []).reduce((a, r) => a + (Number(r[k]) || 0), 0);
-      setMoneyTotals({
-        income:   sum(incomeR.data,   'amount_aed'),
-        expenses: sum(expensesR.data, 'amount_aed'),
-      });
+      const cash      = sum(cashR.rows, 'balance');
+      const expenses  = sum(expR.rows,  'amount');
+      const revenue   = sum(invAllR.rows, 'revenue');
+      const collected = sum(invAllR.rows, 'amount_paid');
+      const pending   = sum(invAllR.rows, 'due_payment');
+      setFinance({ cash, expenses, pending, collected, revenue });
+
+      // Quotation counts from the real table
+      const qc = { awarded: 0, dropped: 0, lost: 0, pending: 0 };
+      for (const r of quoAllR.rows || []) {
+        const s = String(r.status || 'pending').toLowerCase().trim();
+        if (qc[s] != null) qc[s]++;
+      }
+      const total = (quoAllR.rows || []).length || (quoAllR.count || 0);
+      setQuotationCounts({ ...qc, total });
+
       setLoading(false);
     })();
   }, []);
+
+  const netNow      = finance.cash - finance.expenses;
+  const expectedNet = (finance.cash + finance.pending) - finance.expenses;
+  const winRate     = quotationCounts.total > 0 ? Math.round((quotationCounts.awarded / quotationCounts.total) * 100) : 0;
 
   return (
     <div style={{ padding: '28px 36px 60px', color: theme.text }}>
@@ -64,15 +92,25 @@ export default function Home() {
         <h1 style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: theme.gold }}>Home</h1>
       </div>
 
-      {/* Big money cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 22 }}>
-        <BigStat label="Income received (AED)" value={moneyTotals.income} color={theme.green} />
-        <BigStat label="Expenses (AED)"         value={moneyTotals.expenses} color={theme.amber} />
-        <BigStat label="Net (AED)"              value={moneyTotals.income - moneyTotals.expenses}
-                  color={moneyTotals.income >= moneyTotals.expenses ? theme.green : theme.red} />
+      <h2 style={sectionHeading}>Cash position</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <KPIBox label="Total Cash"      value={finance.cash}    loading={loading} suffix="AED" />
+        <KPIBox label="Pending Revenue" value={finance.pending} loading={loading} color={theme.blue}  suffix="AED" />
+        <KPIBox label="Expenses"        value={finance.expenses} loading={loading} color={theme.amber} suffix="AED" />
+        <KPIBox label="Net Now"         value={netNow} loading={loading} color={netNow >= 0 ? theme.green : theme.red} suffix="AED" />
+        <KPIBox label="Expected Net"    value={expectedNet} loading={loading} color={expectedNet >= 0 ? theme.green : theme.red} suffix="AED" />
       </div>
 
-      {/* Room tiles */}
+      <h2 style={sectionHeading}>Quotations</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+        <KPIBox label="Total"   value={quotationCounts.total}   loading={loading} />
+        <KPIBox label="Awarded" value={quotationCounts.awarded} loading={loading} color={theme.green} />
+        <KPIBox label="Dropped" value={quotationCounts.dropped} loading={loading} color={theme.red} />
+        <KPIBox label="Lost"    value={quotationCounts.lost}    loading={loading} color={theme.red} />
+        <KPIBox label="Pending" value={quotationCounts.pending} loading={loading} color={theme.amber} />
+        <KPIBox label="Win rate" value={`${winRate}`} loading={loading} suffix="%" />
+      </div>
+
       <h2 style={sectionHeading}>At a glance</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
         {TILES.map((t) => (
@@ -87,7 +125,6 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Recents */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginTop: 22 }}>
         <RecentList title="Open tasks" href="/tasks" items={recents.tasks}
                     render={(t) => (
@@ -98,40 +135,18 @@ export default function Home() {
                         </div>
                       </>
                     )} />
-        <RecentList title="Active deals" href="/sales" items={recents.deals}
-                    render={(d) => (
+        <RecentList title="Latest invoices" href="/invoices" items={recents.invoices}
+                    render={(i) => (
                       <>
-                        <div style={{ color: theme.text }}>{d.deal_name || '(unnamed)'}</div>
+                        <div style={{ color: theme.text }}>
+                          {i.client || '(no client)'}
+                          {i.invoice_number ? <span style={{ color: theme.textMuted }}> · #{i.invoice_number}</span> : null}
+                        </div>
                         <div style={{ color: theme.textMuted, fontSize: 11 }}>
-                          {d.client || '—'} · {d.stage} · {d.value_aed ? fmtCompact(d.value_aed) + ' AED' : '—'}
+                          {`Revenue ${fmtCompact(i.revenue)} · Paid ${fmtCompact(i.amount_paid)} · Pending ${fmtCompact(i.due_payment)} AED`}
                         </div>
                       </>
                     )} />
-        <RecentList title="Latest content" href="/content" items={recents.content}
-                    render={(c) => (
-                      <>
-                        <div style={{ color: theme.text }}>{c.title || '(untitled)'}</div>
-                        <div style={{ color: theme.textMuted, fontSize: 11 }}>
-                          {[c.platform, c.status, c.publish_date].filter(Boolean).join(' · ') || '—'}
-                        </div>
-                      </>
-                    )} />
-      </div>
-    </div>
-  );
-}
-
-function BigStat({ label, value, color }) {
-  return (
-    <div style={{
-      padding: '18px 20px', borderRadius: 12, background: theme.bg2,
-      border: `1px solid ${theme.border}`,
-    }}>
-      <div style={{ fontSize: 10, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: 700 }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 30, fontWeight: 800, color, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
-        {fmtCompact(value || 0)}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
+import { fetchAllRows } from '../../lib/fetchAll';
 import { Toast, useUndoToast, LoadingSpinner } from '../Toast';
 
 // Generic schema-driven room shell.
@@ -10,10 +11,12 @@ import { Toast, useUndoToast, LoadingSpinner } from '../Toast';
 //     key:     'table_name',
 //     label:   'Tab label',
 //     fields:  [{ key, label, type?, section?, options?, placeholder?, prefix?, multiline?, full? }],
-//     columns: [{ key, label, type?, flex?, align?, render?(value, row), format?(value, row) }],
+//     columns: [{ key, label, type?, flex?, align?, render?(value, row), format?(value, row), editable? }],
 //     addLabel: 'Invoice',
 //     defaults: { status: 'pending' },
-//     kpisFromRows: (rows) => <KPIRow ... />   // optional, rendered above the table
+//     kpisFromRows: (rows, { loading, totalCount }) => <KPIRow ... />,
+//     order:    'created_at' | column name,
+//     ascending: false,
 //   }
 
 export default function RoomShell({ title, group, tabs }) {
@@ -62,8 +65,12 @@ export default function RoomShell({ title, group, tabs }) {
   );
 }
 
-function TabBody({ key: tableName, fields, columns, addLabel, defaults, kpisFromRows }) {
+function TabBody({
+  key: tableName, fields, columns, addLabel, defaults, kpisFromRows,
+  order = 'created_at', ascending = false,
+}) {
   const [rows, setRows] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
@@ -74,22 +81,21 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults, kpisFrom
 
   async function load() {
     setLoading(true); setError(null);
-    const { data, error } = await supabase
-      .from(tableName).select('*').order('created_at', { ascending: false });
+    const { rows, count, error } = await fetchAllRows(tableName, { order, ascending });
     if (error) setError(error.message);
-    setRows(data || []);
+    setRows(rows);
+    setTotalCount(count);
     setLoading(false);
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [tableName]);
 
-  // Strip id/timestamps before re-inserting / reverting
   function clean(row) {
     const { id, created_at, updated_at, ...rest } = row;
     return rest;
   }
 
-  async function registerUndo(change) {
+  function registerUndoForChange(change) {
     if (change.kind === 'insert') {
       showToast(`Created ${addLabel?.toLowerCase() || 'record'}.`, async () => {
         await supabase.from(tableName).delete().eq('id', change.id);
@@ -102,11 +108,32 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults, kpisFrom
       });
     } else if (change.kind === 'delete') {
       showToast(`Deleted ${addLabel?.toLowerCase() || 'record'}.`, async () => {
-        await supabase.from(tableName).insert({ id: change.row.id, ...clean(change.row) });
+        await supabase.from(tableName).insert({ id: change.row.id, ...clean(change.row) }).select();
         load();
       });
     }
     load();
+  }
+
+  // Inline cell edit — used when a column has `editable: true`.
+  async function commitInline(row, columnKey, nextValue, isNumber) {
+    const before = { ...row };
+    const v = isNumber ? (nextValue === '' || nextValue == null ? null : Number(nextValue)) : (nextValue === '' ? null : nextValue);
+    if (isNumber && v != null && !Number.isFinite(v)) return;
+    if ((before[columnKey] ?? null) === (v ?? null)) return;
+
+    // Optimistic update
+    setRows((xs) => xs.map((r) => r.id === row.id ? { ...r, [columnKey]: v } : r));
+    const { error } = await supabase.from(tableName).update({ [columnKey]: v }).eq('id', row.id);
+    if (error) {
+      setError(error.message);
+      setRows((xs) => xs.map((r) => r.id === row.id ? before : r));
+      return;
+    }
+    showToast(`Updated ${addLabel?.toLowerCase() || 'record'}.`, async () => {
+      await supabase.from(tableName).update({ [columnKey]: before[columnKey] }).eq('id', row.id);
+      setRows((xs) => xs.map((r) => r.id === row.id ? before : r));
+    });
   }
 
   const filtered = useMemo(() => {
@@ -125,7 +152,7 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults, kpisFrom
     <>
       {kpisFromRows && (
         <div style={{ marginTop: 20 }}>
-          {kpisFromRows(rows, { loading })}
+          {kpisFromRows(rows, { loading, totalCount })}
         </div>
       )}
 
@@ -138,7 +165,11 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults, kpisFrom
         />
         <div style={{ color: theme.textMuted, fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
           {loading && <LoadingSpinner size={12} />}
-          {loading ? 'loading…' : `${filtered.length} of ${rows.length}`}
+          {loading
+            ? 'loading…'
+            : query
+              ? `${filtered.length} match · ${fmtNumber(totalCount)} total`
+              : `${fmtNumber(totalCount)} total${rows.length < totalCount ? ` · showing ${fmtNumber(rows.length)}` : ''}`}
         </div>
         <button onClick={() => setEditing({ ...EMPTY })} style={primaryBtn}>
           + {addLabel || 'Add'}
@@ -168,33 +199,7 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults, kpisFrom
           </div>
         )}
         {!loading && filtered.map((r) => (
-          <div
-            key={r.id}
-            onClick={() => setEditing(r)}
-            style={tableRow}
-            onMouseEnter={(e) => (e.currentTarget.style.background = theme.bgHover)}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          >
-            {columns.map((c) => {
-              const raw = r[c.key];
-              let content;
-              if (c.render) content = c.render(raw, r);
-              else if (c.format) content = c.format(raw, r);
-              else if (raw == null || raw === '') content = '—';
-              else if (c.type === 'currency_aed') content = fmtCompact(raw);
-              else content = String(raw);
-              return (
-                <div key={c.key} style={{
-                  flex: c.flex || 1, textAlign: c.align || 'left',
-                  color: theme.textDim, fontSize: 13, minWidth: 0,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  fontVariantNumeric: c.align === 'right' ? 'tabular-nums' : 'normal',
-                }}>
-                  {content}
-                </div>
-              );
-            })}
-          </div>
+          <RowView key={r.id} row={r} columns={columns} onClick={() => setEditing(r)} onInlineCommit={commitInline} />
         ))}
       </div>
 
@@ -205,12 +210,127 @@ function TabBody({ key: tableName, fields, columns, addLabel, defaults, kpisFrom
           tableName={tableName}
           addLabel={addLabel}
           onClose={() => setEditing(null)}
-          onChange={(change) => { setEditing(null); registerUndo(change); }}
+          onChange={(change) => { setEditing(null); registerUndoForChange(change); }}
         />
       )}
 
       <Toast toast={toast} onUndo={runUndo} onDismiss={dismissToast} />
     </>
+  );
+}
+
+function RowView({ row, columns, onClick, onInlineCommit }) {
+  return (
+    <div
+      onClick={onClick}
+      style={tableRow}
+      onMouseEnter={(e) => (e.currentTarget.style.background = theme.bgHover)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+    >
+      {columns.map((c) => {
+        const raw = row[c.key];
+        if (c.editable) {
+          return (
+            <InlineCell
+              key={c.key}
+              row={row}
+              column={c}
+              value={raw}
+              onCommit={(v) => onInlineCommit(row, c.key, v, c.type === 'number' || c.type === 'currency_aed')}
+            />
+          );
+        }
+        let content;
+        if (c.render) content = c.render(raw, row);
+        else if (c.format) content = c.format(raw, row);
+        else if (raw == null || raw === '') content = '—';
+        else if (c.type === 'currency_aed') content = fmtCompact(raw);
+        else content = String(raw);
+        return (
+          <div key={c.key} style={{
+            flex: c.flex || 1, textAlign: c.align || 'left',
+            color: theme.textDim, fontSize: 13, minWidth: 0,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            fontVariantNumeric: c.align === 'right' ? 'tabular-nums' : 'normal',
+          }}>
+            {content}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function InlineCell({ row, column: c, value, onCommit }) {
+  const isNum = c.type === 'number' || c.type === 'currency_aed';
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value == null ? '' : String(value));
+
+  useEffect(() => { setV(value == null ? '' : String(value)); }, [value]);
+
+  function commit() {
+    setEditing(false);
+    const trimmed = v;
+    if (isNum) {
+      const n = trimmed === '' ? null : Number(trimmed);
+      if (n !== null && !Number.isFinite(n)) { setV(value == null ? '' : String(value)); return; }
+      if ((Number(value) || null) === n) return;
+      onCommit(n);
+    } else {
+      if ((value ?? null) === (trimmed || null)) return;
+      onCommit(trimmed);
+    }
+  }
+
+  if (!editing) {
+    let display;
+    if (c.render) display = c.render(value, row);
+    else if (c.format) display = c.format(value, row);
+    else if (value == null || value === '') display = '—';
+    else if (c.type === 'currency_aed') display = fmtCompact(value);
+    else display = String(value);
+    return (
+      <div
+        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+        title="Click to edit"
+        style={{
+          flex: c.flex || 1, textAlign: c.align || 'left',
+          color: theme.text, fontSize: 13, minWidth: 0,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          fontVariantNumeric: c.align === 'right' ? 'tabular-nums' : 'normal',
+          cursor: 'text',
+          padding: '2px 6px', margin: '-2px -6px',
+          borderRadius: 4, border: '1px dashed transparent',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.border; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; }}
+      >
+        {display}
+      </div>
+    );
+  }
+
+  return (
+    <input
+      autoFocus
+      type={isNum ? 'number' : 'text'}
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') { setV(value == null ? '' : String(value)); setEditing(false); }
+      }}
+      style={{
+        flex: c.flex || 1, textAlign: c.align || 'left',
+        background: theme.bg3, color: theme.text,
+        border: `1px solid ${theme.gold}`, borderRadius: 4,
+        padding: '4px 6px', fontSize: 13, outline: 'none',
+        fontFamily: 'inherit', minWidth: 0,
+        fontVariantNumeric: c.align === 'right' ? 'tabular-nums' : 'normal',
+      }}
+    />
   );
 }
 
@@ -408,7 +528,7 @@ export const fmtNumber = (v) => {
 };
 
 // Compact human-friendly numbers: 999 → "999", 1500 → "1.5K", 1000 → "1K",
-// 2345 → "2.3K", 1_000_000 → "1M", 57_500_000 → "57.5M". Strips trailing ".0".
+// 2345 → "2.3K", 1_000_000 → "1M", 57_500_000 → "57.5M".
 export const fmtCompact = (v) => {
   if (v == null || v === '') return '—';
   const n = Number(v);
@@ -417,15 +537,14 @@ export const fmtCompact = (v) => {
   const abs = Math.abs(n);
   if (abs < 1000) return sign + Math.round(abs).toString();
   let value, suffix;
-  if (abs < 1_000_000)       { value = abs / 1_000;         suffix = 'K'; }
-  else if (abs < 1_000_000_000) { value = abs / 1_000_000;  suffix = 'M'; }
-  else                       { value = abs / 1_000_000_000; suffix = 'B'; }
+  if (abs < 1_000_000)         { value = abs / 1_000;         suffix = 'K'; }
+  else if (abs < 1_000_000_000) { value = abs / 1_000_000;    suffix = 'M'; }
+  else                          { value = abs / 1_000_000_000; suffix = 'B'; }
   const rounded = Math.round(value * 10) / 10;
   const str = rounded % 1 === 0 ? String(Math.round(rounded)) : rounded.toFixed(1);
   return sign + str + suffix;
 };
 
-// ---- shared style helpers (also useful for custom pages like CashFlow) ----
 export const KPIBox = ({ label, value, color, suffix, loading }) => (
   <div style={{
     padding: '16px 18px', borderRadius: 12,
@@ -450,7 +569,6 @@ export const KPIBox = ({ label, value, color, suffix, loading }) => (
   </div>
 );
 
-// ---- styles ----
 const fieldLabel = { fontSize: 10, fontWeight: 700, letterSpacing: 1, color: theme.textMuted, textTransform: 'uppercase' };
 const inputStyle = {
   background: theme.bg3, color: theme.text,

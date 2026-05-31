@@ -1,14 +1,12 @@
 -- =============================================================================
--- BAB Dashboard — Combined migration (Rounds 1 + 2 + finance modules)
+-- BAB Dashboard — Combined migration
 --
--- Paste this whole file into the Supabase SQL Editor and run:
+-- Paste this whole file into the Supabase SQL Editor:
 --   https://supabase.com/dashboard/project/dvklqmoddcqbisnbknsj/sql/new
 --
--- Everything below is idempotent (uses CREATE TABLE IF NOT EXISTS / ADD COLUMN
--- IF NOT EXISTS / DROP POLICY IF EXISTS before CREATE POLICY). It is safe to
--- re-run on a fresh database or an existing one that already has 0001 applied.
+-- Everything is idempotent — safe to re-run on a database that already has
+-- some of these migrations applied.
 --
--- Contents:
 --   0001 — Round 1 init (18 base tables + updated_at trigger + RLS lockdown)
 --   0002 — Influencers (comprehensive + focused) real columns
 --   0003 — Clients
@@ -21,12 +19,13 @@
 --   0010 — Marketing
 --   0011 — Social Algorithm (new table social_algorithm_notes)
 --   0012 — Content
---   0013 — Sales (deals + quotations — distinct from the new quotations table)
---   0014 — Finance (money + expenses — distinct from the new expenses table)
+--   0013 — Sales (deals + quotations distinct from the new quotations table)
+--   0014 — Finance (money + expenses distinct from the new expenses table)
 --   0015 — Maps (map_locations)
 --   0016 — Life areas
 --   0017 — AI Assistant (new table ai_conversations)
 --   0018 — Finance modules: invoices, quotations, expenses, cash_accounts
+--   0019 — Objectives Kanban: objectives_tasks
 -- =============================================================================
 
 
@@ -635,3 +634,35 @@ alter table public.cash_accounts
   add column if not exists balance numeric default 0;
 
 create index if not exists cash_accounts_account_idx on public.cash_accounts (account);
+
+-- ============================================================
+-- 0019_objectives_tasks.sql
+-- ============================================================
+-- Objectives: new objectives_tasks table for the day/week Kanban.
+-- Idempotent. Matches the column set required by /objectives.
+
+create table if not exists public.objectives_tasks (
+  id         uuid primary key default gen_random_uuid(),
+  title      text,
+  day        text,
+  week       text,
+  done       boolean default false,
+  position   int,
+  created_at timestamptz not null default now()
+);
+
+alter table public.objectives_tasks enable row level security;
+alter table public.objectives_tasks force  row level security;
+
+drop policy if exists obj_select on public.objectives_tasks;
+drop policy if exists obj_insert on public.objectives_tasks;
+drop policy if exists obj_update on public.objectives_tasks;
+drop policy if exists obj_delete on public.objectives_tasks;
+
+create policy obj_select on public.objectives_tasks for select to authenticated using (true);
+create policy obj_insert on public.objectives_tasks for insert to authenticated with check (true);
+create policy obj_update on public.objectives_tasks for update to authenticated using (true) with check (true);
+create policy obj_delete on public.objectives_tasks for delete to authenticated using (true);
+
+create index if not exists obj_week_idx on public.objectives_tasks (week);
+create index if not exists obj_week_day_idx on public.objectives_tasks (week, day);

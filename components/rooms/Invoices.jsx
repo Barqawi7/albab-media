@@ -11,12 +11,12 @@ const fields = [
 ];
 
 const columns = [
-  { key: 'invoice_number', label: '#',           flex: 0.8 },
-  { key: 'client',         label: 'Client',      flex: 1.6 },
-  { key: 'vertical',       label: 'Vertical',    flex: 1 },
-  { key: 'revenue',        label: 'Revenue',     flex: 0.9, align: 'right', type: 'currency_aed' },
-  { key: 'amount_paid',    label: 'Paid',        flex: 0.9, align: 'right', type: 'currency_aed' },
-  { key: 'due_payment',    label: 'Due',         flex: 0.9, align: 'right', type: 'currency_aed' },
+  { key: 'invoice_number', label: '#',        flex: 0.8 },
+  { key: 'client',         label: 'Client',   flex: 1.6 },
+  { key: 'vertical',       label: 'Vertical', flex: 1 },
+  { key: 'revenue',        label: 'Revenue',  flex: 0.9, align: 'right', type: 'currency_aed', editable: true },
+  { key: 'amount_paid',    label: 'Paid',     flex: 0.9, align: 'right', type: 'currency_aed', editable: true },
+  { key: 'due_payment',    label: 'Pending',  flex: 0.9, align: 'right', type: 'currency_aed', editable: true },
 ];
 
 const sum = (rows, k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);

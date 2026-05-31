@@ -15,16 +15,17 @@ const columns = [
   { key: 'status',           label: 'Status', flex: 0.9, render: (v) => <StatusPill value={v} /> },
 ];
 
-function kpisFromRows(rows, { loading } = {}) {
+function kpisFromRows(rows, { loading, totalCount } = {}) {
   const counts = Object.fromEntries(STATUSES.map((s) => [s, 0]));
   for (const r of rows) {
-    const s = (r.status || 'pending').toLowerCase();
+    const s = String(r.status || 'pending').toLowerCase().trim();
     if (counts[s] != null) counts[s]++;
   }
-  const total = rows.length;
+  const total = totalCount || rows.length;
   const winRate = total > 0 ? Math.round((counts.awarded / total) * 100) : 0;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+      <KPIBox label="Total"   value={total}          loading={loading} />
       <KPIBox label="Awarded" value={counts.awarded} loading={loading} color={theme.green} />
       <KPIBox label="Dropped" value={counts.dropped} loading={loading} color={theme.red} />
       <KPIBox label="Lost"    value={counts.lost}    loading={loading} color={theme.red} />

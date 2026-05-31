@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabase';
-import { fmtCompact } from './_RoomShell';
+import { fmtCompact, KPIBox, fmtNumber } from './_RoomShell';
+import { fetchAllRows } from '../../lib/fetchAll';
 
 const TABS = [
   { key: 'influencers_comprehensive', label: 'Comprehensive' },
@@ -36,33 +37,54 @@ function totalFollowers(row) {
   }, 0);
 }
 
+const TIER_OPTIONS = ['Mega', 'Macro', 'Mid', 'Micro'];
+
+function tierFor(totalReach) {
+  if (totalReach >= 10_000_000) return 'Mega';
+  if (totalReach >=  1_000_000) return 'Macro';
+  if (totalReach >=    100_000) return 'Mid';
+  return 'Micro';
+}
+
 export default function Influencers() {
   const [tab, setTab] = useState(TABS[0].key);
   const [rows, setRows] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [editing, setEditing] = useState(null); // null | EMPTY | row
+  const [tierFilter, setTierFilter] = useState('all');
+  const [editing, setEditing] = useState(null);
 
   async function load() {
     setLoading(true);
     setError(null);
-    const { data, error } = await supabase
-      .from(tab)
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { rows, count, error } = await fetchAllRows(tab, { order: 'created_at', ascending: false });
     if (error) setError(error.message);
-    setRows(data || []);
+    setRows(rows);
+    setTotalCount(count);
     setLoading(false);
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab]);
 
+  // Tier counts — Mega 10M+, Macro 1M-10M, Mid 100K-1M, Micro <100K
+  const tierCounts = useMemo(() => {
+    const c = { Mega: 0, Macro: 0, Mid: 0, Micro: 0 };
+    for (const r of rows) {
+      const total = totalFollowers(r);
+      const tier = tierFor(total);
+      c[tier]++;
+    }
+    return c;
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((r) => {
       if (statusFilter !== 'all' && (r.status || 'active') !== statusFilter) return false;
+      if (tierFilter !== 'all' && tierFor(totalFollowers(r)) !== tierFilter) return false;
       if (!q) return true;
       const hay = [
         r.name, r.country, r.city, r.niche, r.category, r.languages,
@@ -71,7 +93,7 @@ export default function Influencers() {
       ].filter(Boolean).join(' ').toLowerCase();
       return hay.includes(q);
     });
-  }, [rows, query, statusFilter]);
+  }, [rows, query, statusFilter, tierFilter]);
 
   return (
     <div style={{ padding: '28px 36px 60px', color: theme.text }}>
@@ -116,6 +138,36 @@ export default function Influencers() {
         })}
       </div>
 
+      {/* KPI strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 18 }}>
+        <KPIBox label="Total influencers" value={totalCount} loading={loading} />
+        <KPIBox label="Mega (10M+)"     value={tierCounts.Mega}  loading={loading} color="#A78BFA" />
+        <KPIBox label="Macro (1M-10M)"  value={tierCounts.Macro} loading={loading} color={theme.blue} />
+        <KPIBox label="Mid (100K-1M)"   value={tierCounts.Mid}   loading={loading} color={theme.gold} />
+        <KPIBox label="Micro (<100K)"   value={tierCounts.Micro} loading={loading} color={theme.green} />
+      </div>
+
+      {/* Tier filter chips */}
+      <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+        {['all', ...TIER_OPTIONS].map((t) => (
+          <button
+            key={t}
+            onClick={() => setTierFilter(t)}
+            style={{
+              background: t === tierFilter ? theme.goldTint : 'transparent',
+              color: t === tierFilter ? theme.gold : theme.textDim,
+              border: `1px solid ${t === tierFilter ? theme.gold : theme.border}`,
+              borderRadius: 999, padding: '4px 12px',
+              fontSize: 12, fontWeight: 600,
+              cursor: 'pointer',
+              textTransform: 'capitalize',
+            }}
+          >
+            {t === 'all' ? 'All tiers' : t}
+          </button>
+        ))}
+      </div>
+
       {/* Filters */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '16px 0 12px', flexWrap: 'wrap' }}>
         <input
@@ -133,7 +185,7 @@ export default function Influencers() {
           {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <div style={{ color: theme.textMuted, fontSize: 12, marginLeft: 'auto' }}>
-          {loading ? 'loading…' : `${filtered.length} of ${rows.length}`}
+          {loading ? 'loading…' : `${fmtNumber(filtered.length)} match · ${fmtNumber(totalCount)} total${rows.length < totalCount ? ` (loaded ${fmtNumber(rows.length)})` : ''}`}
         </div>
       </div>
 
