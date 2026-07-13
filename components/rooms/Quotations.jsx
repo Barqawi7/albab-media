@@ -4,14 +4,14 @@ import { theme } from '../../lib/theme';
 const STATUSES = ['awarded', 'dropped', 'lost', 'pending'];
 
 const fields = [
-  { key: 'client',           label: 'Client',           section: 'Quotation' },
+  { key: 'client_name',      label: 'Client',           section: 'Quotation' },
   { key: 'quotation_number', label: 'Quotation number', section: 'Quotation' },
   { key: 'status',           label: 'Status',           section: 'Quotation', type: 'select', options: STATUSES },
 ];
 
 const columns = [
   { key: 'quotation_number', label: '#',      flex: 0.8 },
-  { key: 'client',           label: 'Client', flex: 2.2 },
+  { key: 'client_name',      label: 'Client', flex: 2.2 },
   { key: 'status',           label: 'Status', flex: 0.9, render: (v) => <StatusPill value={v} /> },
 ];
 

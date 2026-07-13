@@ -53,11 +53,11 @@ export default function Home() {
     const [cash, expenses, invoices, quotations, tasks, events, pipeline, rem] = await Promise.all([
       safeAll('cash_accounts', { select: 'account,balance,created_at' }),
       safeAll('expenses',      { select: 'item,amount,created_at' }),
-      safeAll('invoices',      { select: 'client,invoice_number,revenue,amount_paid,due_payment,created_at' }),
-      safeAll('quotations',    { select: 'client,quotation_number,status,created_at' }),
+      safeAll('finance_invoices', { select: 'client_name,invoice_number,revenue,amount_paid,due_payment,created_at' }),
+      safeAll('quotations',    { select: 'client_name,quotation_number,status,created_at' }),
       safeAll('tasks',         { select: 'id,title,status,due_date,created_at' }),
       safeAll('events',        { select: 'name,city,event_date,status,created_at' }),
-      safeAll('pipeline_opportunities', { select: 'name,client,stage,value_aed,created_at' }),
+      safeAll('sales_leads',   { select: 'client,stage,value,created_at' }),
       safeAll('reminders',     { select: 'text,due_date,done,created_at' }),
     ]);
     setData({ cash, expenses, invoices, quotations, tasks, events, pipeline });
@@ -121,9 +121,9 @@ export default function Home() {
 
   const activity = useMemo(() => {
     const feed = [];
-    data.invoices.forEach((r) => feed.push({ ts: r.created_at, icon: '🧾', label: `Invoice ${r.invoice_number || ''}`.trim(), sub: r.client || 'no client' }));
-    data.quotations.forEach((r) => feed.push({ ts: r.created_at, icon: '📄', label: `Quotation ${r.quotation_number || ''}`.trim(), sub: `${r.client || ''} · ${r.status || ''}` }));
-    data.pipeline.forEach((r) => feed.push({ ts: r.created_at, icon: '📈', label: r.name || 'Opportunity', sub: `${r.stage || ''} · ${r.client || ''}` }));
+    data.invoices.forEach((r) => feed.push({ ts: r.created_at, icon: '🧾', label: `Invoice ${r.invoice_number || ''}`.trim(), sub: r.client_name || 'no client' }));
+    data.quotations.forEach((r) => feed.push({ ts: r.created_at, icon: '📄', label: `Quotation ${r.quotation_number || ''}`.trim(), sub: `${r.client_name || ''} · ${r.status || ''}` }));
+    data.pipeline.forEach((r) => feed.push({ ts: r.created_at, icon: '📈', label: r.client || 'Lead', sub: `${r.stage || ''}` }));
     data.tasks.forEach((r) => feed.push({ ts: r.created_at, icon: '✓', label: r.title || 'Task', sub: r.status || '' }));
     data.events.forEach((r) => feed.push({ ts: r.created_at, icon: '📅', label: r.name || 'Event', sub: r.city || '' }));
     return feed.filter((x) => x.ts).sort((a, b) => String(b.ts).localeCompare(String(a.ts))).slice(0, 12);
@@ -248,7 +248,7 @@ export default function Home() {
                 <div key={i} style={rowStyle}>
                   <span style={{ color: theme.amber, fontSize: 14 }}>●</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: theme.text, fontSize: 13 }}>{q.client || '(no client)'} {q.quotation_number ? <span style={{ color: theme.textMuted }}>· #{q.quotation_number}</span> : null}</div>
+                    <div style={{ color: theme.text, fontSize: 13 }}>{q.client_name || '(no client)'} {q.quotation_number ? <span style={{ color: theme.textMuted }}>· #{q.quotation_number}</span> : null}</div>
                   </div>
                 </div>
               ))

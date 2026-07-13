@@ -19,7 +19,7 @@ export default function CashFlow() {
     const [ca, ex, inv] = await Promise.all([
       supabase.from('cash_accounts').select('*').order('created_at', { ascending: true }),
       supabase.from('expenses').select('*').order('created_at', { ascending: true }),
-      supabase.from('invoices').select('due_payment'),
+      supabase.from('finance_invoices').select('due_payment'),
     ]);
     if (ca.error || ex.error || inv.error) {
       setError(ca.error?.message || ex.error?.message || inv.error?.message);

@@ -2,7 +2,7 @@ import RoomShell, { KPIBox } from './_RoomShell';
 import { theme } from '../../lib/theme';
 
 const fields = [
-  { key: 'client',          label: 'Client',          section: 'Invoice' },
+  { key: 'client_name',     label: 'Client',          section: 'Invoice' },
   { key: 'vertical',        label: 'Vertical',        section: 'Invoice' },
   { key: 'invoice_number',  label: 'Invoice number',  section: 'Invoice' },
   { key: 'revenue',         label: 'Revenue (AED)',   section: 'Amounts', type: 'currency_aed' },
@@ -12,7 +12,7 @@ const fields = [
 
 const columns = [
   { key: 'invoice_number', label: '#',        flex: 0.8 },
-  { key: 'client',         label: 'Client',   flex: 1.6 },
+  { key: 'client_name',    label: 'Client',   flex: 1.6 },
   { key: 'vertical',       label: 'Vertical', flex: 1 },
   { key: 'revenue',        label: 'Revenue',  flex: 0.9, align: 'right', type: 'currency_aed', editable: true },
   { key: 'amount_paid',    label: 'Paid',     flex: 0.9, align: 'right', type: 'currency_aed', editable: true },
@@ -37,7 +37,7 @@ export default function Invoices() {
       title="Invoices"
       group="Finance"
       tabs={[{
-        key: 'invoices', label: 'Invoices',
+        key: 'finance_invoices', label: 'Invoices',
         fields, columns,
         addLabel: 'Invoice',
         kpisFromRows,

@@ -25,6 +25,8 @@ import QuickComments from './QuickComments';
 import Tasks from './Tasks';
 import Ideas from './Ideas';
 import Life from './Life';
+import ClientsDirectory from './ClientsDirectory';
+import Objectives from './Objectives';
 
 export const GROUPS = [
   {
@@ -66,6 +68,7 @@ export const GROUPS = [
   {
     label: 'Connections',
     rooms: [
+      { slug: 'directory', label: 'Directory', component: ClientsDirectory },
       { slug: 'maps', label: 'Maps (Virtual)', component: Maps },
     ],
   },
@@ -84,6 +87,7 @@ export const GROUPS = [
       { slug: 'tasks', label: 'Tasks', component: Tasks },
       { slug: 'ideas', label: 'Ideas', component: Ideas },
       { slug: 'life',  label: 'Life',  component: Life },
+      { slug: 'objectives-board', label: 'Objectives', component: Objectives },
     ],
   },
 ];

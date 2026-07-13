@@ -1,42 +1,44 @@
-import RoomShell, { StatusPill, KPIBox } from './_RoomShell';
+import RoomShell, { KPIBox } from './_RoomShell';
 import { theme } from '../../lib/theme';
 
-// SALES → Data. Backed by the existing `clients` table so no data is lost in the
-// restructure — the old Clients room is retired but its records live on here.
+// SALES → Data. Flat, editable table of every sales lead (sales_leads) — the raw
+// data behind the Sales Pipeline board.
 
 const fields = [
-  { key: 'name',           label: 'Name',           section: 'Identity' },
-  { key: 'type',           label: 'Type',           section: 'Identity', type: 'select', options: ['brand', 'agency', 'individual'] },
-  { key: 'industry',       label: 'Industry',       section: 'Identity' },
-  { key: 'country',        label: 'Country',        section: 'Identity' },
-  { key: 'city',           label: 'City',           section: 'Identity' },
+  { key: 'client',        label: 'Client',        section: 'Lead' },
+  { key: 'vertical',      label: 'Vertical',      section: 'Lead' },
+  { key: 'pool',          label: 'Pool',          section: 'Lead', type: 'select', options: ['Focused', 'Important', 'Marketing'] },
+  { key: 'stage',         label: 'Stage',         section: 'Lead' },
+  { key: 'lead_type',     label: 'Lead type',     section: 'Lead' },
+  { key: 'value',         label: 'Value',         section: 'Lead' },
+  { key: 'quarter',       label: 'Quarter',       section: 'Lead' },
 
-  { key: 'contact_person', label: 'Contact person', section: 'Contact' },
-  { key: 'email',          label: 'Email',          section: 'Contact' },
-  { key: 'phone',          label: 'Phone',          section: 'Contact' },
-  { key: 'whatsapp',       label: 'WhatsApp',       section: 'Contact' },
+  { key: 'spoc',          label: 'SPOC',          section: 'Contact' },
+  { key: 'position',      label: 'Position',      section: 'Contact' },
+  { key: 'phone',         label: 'Phone',         section: 'Contact' },
+  { key: 'email',         label: 'Email',         section: 'Contact' },
 
-  { key: 'status',         label: 'Status',         section: 'Status', type: 'select', options: ['active', 'lead', 'dormant'] },
-  { key: 'since',          label: 'Client since',   section: 'Status', type: 'date' },
-  { key: 'notes',          label: 'Notes',          section: 'Status', multiline: true, full: true },
+  { key: 'action_needed', label: 'Action needed', section: 'Notes', multiline: true, full: true },
+  { key: 'comments',      label: 'Comments',      section: 'Notes', multiline: true, full: true },
 ];
 
 const columns = [
-  { key: 'name',     label: 'Name',     flex: 2 },
-  { key: 'type',     label: 'Type',     flex: 1 },
-  { key: 'industry', label: 'Industry', flex: 1.2 },
-  { key: 'country',  label: 'Country',  flex: 1 },
-  { key: 'status',   label: 'Status',   flex: 0.9, render: (v) => <StatusPill value={v} /> },
+  { key: 'client',   label: 'Client',   flex: 1.8 },
+  { key: 'vertical', label: 'Vertical', flex: 1.2 },
+  { key: 'stage',    label: 'Stage',    flex: 1, editable: true },
+  { key: 'pool',     label: 'Pool',     flex: 0.9 },
+  { key: 'value',    label: 'Value',    flex: 0.9, align: 'right', editable: true },
+  { key: 'spoc',     label: 'SPOC',     flex: 1 },
 ];
 
 function kpisFromRows(rows, { loading, totalCount } = {}) {
-  const active = rows.filter((r) => String(r.status).toLowerCase() === 'active').length;
-  const leads  = rows.filter((r) => String(r.status).toLowerCase() === 'lead').length;
+  const counts = rows.reduce((acc, r) => { const p = r.pool || 'Other'; acc[p] = (acc[p] || 0) + 1; return acc; }, {});
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-      <KPIBox label="Total records" value={totalCount ?? rows.length} loading={loading} />
-      <KPIBox label="Active"        value={active} loading={loading} color={theme.green} />
-      <KPIBox label="Leads"         value={leads}  loading={loading} color={theme.amber} />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+      <KPIBox label="Total leads" value={totalCount ?? rows.length} loading={loading} />
+      <KPIBox label="Focused"     value={counts.Focused || 0}   loading={loading} color={theme.gold} />
+      <KPIBox label="Important"   value={counts.Important || 0} loading={loading} color={theme.blue} />
+      <KPIBox label="Marketing"   value={counts.Marketing || 0} loading={loading} color={theme.green} />
     </div>
   );
 }
@@ -47,10 +49,10 @@ export default function SalesData() {
       title="Data"
       group="Sales"
       tabs={[{
-        key: 'clients', label: 'Sales Data',
+        key: 'sales_leads', label: 'Sales Leads',
         fields, columns,
-        addLabel: 'Record',
-        defaults: { status: 'lead' },
+        addLabel: 'Lead',
+        defaults: { pool: 'Focused' },
         kpisFromRows,
       }]}
     />
