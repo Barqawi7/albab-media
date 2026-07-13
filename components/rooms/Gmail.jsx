@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
+import { AIFeedPlaceholder } from '../ui';
 
 export default function Gmail() {
+  const [tab, setTab] = useState('inbox'); // 'inbox' | 'calendar'
   const [messages, setMessages] = useState(null); // null = not loaded, [] = empty
   const [authed, setAuthed]   = useState(true);
   const [loading, setLoading] = useState(true);
@@ -37,11 +39,11 @@ export default function Gmail() {
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: theme.textMuted, textTransform: 'uppercase' }}>
-            Comms
+            Sales
           </div>
           <h1 style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: theme.gold }}>Gmail</h1>
         </div>
-        {authed && (
+        {authed && tab === 'inbox' && (
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setComposing(true)} style={primaryBtn}>+ Compose</button>
             <button onClick={loadInbox} style={ghostBtn}>Refresh</button>
@@ -49,7 +51,30 @@ export default function Gmail() {
         )}
       </div>
 
-      {!authed ? (
+      {/* Tabs — Inbox and an empty Calendar shell for later */}
+      <div style={{ display: 'flex', gap: 4, marginTop: 20, borderBottom: `1px solid ${theme.border}` }}>
+        {[{ k: 'inbox', l: 'Inbox' }, { k: 'calendar', l: 'Calendar' }].map((t) => {
+          const on = tab === t.k;
+          return (
+            <button key={t.k} onClick={() => setTab(t.k)} style={{
+              background: 'transparent', border: 'none',
+              color: on ? theme.gold : theme.textDim,
+              padding: '10px 14px', fontSize: 13, fontWeight: on ? 700 : 500, cursor: 'pointer',
+              borderBottom: on ? `2px solid ${theme.gold}` : '2px solid transparent', marginBottom: -1,
+            }}>{t.l}</button>
+          );
+        })}
+      </div>
+
+      {tab === 'calendar' ? (
+        <div style={{ marginTop: 20, maxWidth: 640 }}>
+          <AIFeedPlaceholder
+            title="Calendar"
+            note="Empty for now. Google Calendar events will render here once the calendar integration is connected — same OAuth flow as Gmail."
+            lines={4}
+          />
+        </div>
+      ) : !authed ? (
         <div style={{ marginTop: 30, padding: 24, background: theme.bg2, border: `1px solid ${theme.border}`, borderRadius: 12, maxWidth: 520 }}>
           <div style={{ color: theme.text, marginBottom: 12 }}>Connect Gmail to read and send mail from this room.</div>
           <a href="/api/auth/start" style={{ ...primaryBtn, textDecoration: 'none', display: 'inline-block' }}>

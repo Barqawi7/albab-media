@@ -35,7 +35,7 @@ export default function Invoices() {
   return (
     <RoomShell
       title="Invoices"
-      group="Business"
+      group="Finance"
       tabs={[{
         key: 'invoices', label: 'Invoices',
         fields, columns,

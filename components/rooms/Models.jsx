@@ -41,8 +41,8 @@ const columns = [
 export default function Models() {
   return (
     <RoomShell
-      title="Models"
-      group="People"
+      title="Models Data"
+      group="Agents"
       tabs={[{ key: 'models', label: 'Models', fields, columns, addLabel: 'Model', defaults: { status: 'active' } }]}
     />
   );

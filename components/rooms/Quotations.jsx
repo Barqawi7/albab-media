@@ -39,7 +39,7 @@ export default function Quotations() {
   return (
     <RoomShell
       title="Quotations"
-      group="Business"
+      group="Sales"
       tabs={[{
         key: 'quotations', label: 'Quotations',
         fields, columns,

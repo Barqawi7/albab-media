@@ -1,28 +1,30 @@
 // Source of truth for sidebar order, room slugs, and labels.
-// Round 2: add `component: SomeRoom` to a room entry to replace Placeholder.
+// Round 3 restructure — grouped: Finance / Sales / Agents / Real Estate /
+// Connections / Content & Marketing / Personal.
+//
+// Rooms intentionally left out of the sidebar (old code kept on disk, not routed):
+//   Sales.jsx, Finance.jsx, Clients.jsx, Connections.jsx, SocialAlgorithm.jsx,
+//   Expenses.jsx (folded into Cash Flow), AIAssistant.jsx.
+
+import Home from './Home';
+import CashFlow from './CashFlow';
+import Invoices from './Invoices';
+import SalesData from './SalesData';
+import Gmail from './Gmail';
+import Quotations from './Quotations';
+import SalesPipeline from './SalesPipeline';
 import Influencers from './Influencers';
-import Clients from './Clients';
+import FocusedInfluencers from './FocusedInfluencers';
 import Models from './Models';
-import Connections from './Connections';
-import Tasks from './Tasks';
-import Ideas from './Ideas';
+import RealEstate from './RealEstate';
+import Maps from './Maps';
+import Marketing from './Marketing';
+import Content from './Content';
 import Events from './Events';
 import QuickComments from './QuickComments';
-import Marketing from './Marketing';
-import SocialAlgorithm from './SocialAlgorithm';
-import Content from './Content';
-import Sales from './Sales';
-import Finance from './Finance';
-import Maps from './Maps';
+import Tasks from './Tasks';
+import Ideas from './Ideas';
 import Life from './Life';
-import Home from './Home';
-import Gmail from './Gmail';
-import AIAssistant from './AIAssistant';
-import Invoices from './Invoices';
-import Quotations from './Quotations';
-import Expenses from './Expenses';
-import CashFlow from './CashFlow';
-import RealEstate from './RealEstate';
 
 export const GROUPS = [
   {
@@ -32,41 +34,48 @@ export const GROUPS = [
     ],
   },
   {
-    label: 'Business',
+    label: 'Finance',
     rooms: [
-      { slug: 'cash-flow',   label: 'Cash Flow',   component: CashFlow },
-      { slug: 'invoices',    label: 'Invoices',    component: Invoices },
-      { slug: 'quotations',  label: 'Quotations',  component: Quotations },
-      { slug: 'expenses',    label: 'Expenses',    component: Expenses },
-      { slug: 'real-estate', label: 'Real Estate', component: RealEstate },
-      { slug: 'sales',      label: 'Sales',      component: Sales },
-      { slug: 'finance',    label: 'Finance',    component: Finance },
-      { slug: 'clients',    label: 'Clients',    component: Clients },
+      { slug: 'cash-flow', label: 'Cash Flow', component: CashFlow },
+      { slug: 'invoices',  label: 'Invoices',  component: Invoices },
     ],
   },
   {
-    label: 'People',
+    label: 'Sales',
     rooms: [
-      { slug: 'influencers', label: 'Influencers', component: Influencers },
-      { slug: 'models', label: 'Models', component: Models },
-      { slug: 'connections', label: 'Connections', component: Connections },
+      { slug: 'sales-data', label: 'Data',           component: SalesData },
+      { slug: 'gmail',      label: 'Gmail',          component: Gmail },
+      { slug: 'quotations', label: 'Quotations',     component: Quotations },
+      { slug: 'pipeline',   label: 'Sales Pipeline', component: SalesPipeline },
+    ],
+  },
+  {
+    label: 'Agents',
+    rooms: [
+      { slug: 'influencers',         label: 'Influencers Data',   component: Influencers },
+      { slug: 'influencers-focused', label: 'Focused Influencers', component: FocusedInfluencers },
+      { slug: 'models',              label: 'Models Data',        component: Models },
+    ],
+  },
+  {
+    label: 'Real Estate',
+    rooms: [
+      { slug: 'real-estate', label: 'Real Estate', component: RealEstate },
+    ],
+  },
+  {
+    label: 'Connections',
+    rooms: [
+      { slug: 'maps', label: 'Maps (Virtual)', component: Maps },
     ],
   },
   {
     label: 'Content & Marketing',
     rooms: [
-      { slug: 'marketing', label: 'Marketing', component: Marketing },
-      { slug: 'social-algorithm', label: 'Social Algorithm', component: SocialAlgorithm },
-      { slug: 'content', label: 'Content', component: Content },
-      { slug: 'events', label: 'Events', component: Events },
+      { slug: 'marketing',      label: 'Marketing',      component: Marketing },
+      { slug: 'content',        label: 'Content',        component: Content },
+      { slug: 'events',         label: 'Events',         component: Events },
       { slug: 'quick-comments', label: 'Quick Comments', component: QuickComments },
-    ],
-  },
-  {
-    label: 'Comms',
-    rooms: [
-      { slug: 'gmail', label: 'Gmail', component: Gmail },
-      { slug: 'ai-assistant', label: 'AI Assistant', component: AIAssistant },
     ],
   },
   {
@@ -74,8 +83,7 @@ export const GROUPS = [
     rooms: [
       { slug: 'tasks', label: 'Tasks', component: Tasks },
       { slug: 'ideas', label: 'Ideas', component: Ideas },
-      { slug: 'maps', label: 'Maps', component: Maps },
-      { slug: 'life', label: 'Life', component: Life },
+      { slug: 'life',  label: 'Life',  component: Life },
     ],
   },
 ];

@@ -163,9 +163,9 @@ export default function Influencers() {
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: theme.textMuted, textTransform: 'uppercase' }}>
-            People
+            Agents
           </div>
-          <h1 style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: theme.gold }}>Influencers</h1>
+          <h1 style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: theme.gold }}>Influencers Data</h1>
         </div>
         <button onClick={() => setEditing({ ...EMPTY })} style={primaryBtn}>+ Add influencer</button>
       </div>

@@ -22,8 +22,8 @@ const columns = [
 export default function Maps() {
   return (
     <RoomShell
-      title="Maps"
-      group="Personal"
+      title="Maps (Virtual)"
+      group="Connections"
       tabs={[{ key: 'map_locations', label: 'Locations', fields, columns, addLabel: 'Location' }]}
     />
   );
